@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontier Overlay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* The overlay is always dark: it sits over a game window or a stream layout */
+        :root {
+            color-scheme: dark;
+            --bg: #0f1513;
+            --panel: rgba(20, 29, 27, 0.94);
+            --surface: #182220;
+            --surface-2: #1f2b28;
+            --surface-3: #263431;
+            --ink: #e3ebe8;
+            --muted: #93a39d;
+            --faint: #64736e;
+            --line: #2b3834;
+            --accent: #4fc79b;
+            --accent-soft: #1b3a30;
+            --accent-ink: #0f1513;
+            --warn: #e6ad4c;
+            --danger: #ef8a7e;
+
+            --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+            --font-body: 'Barlow', 'Segoe UI', sans-serif;
+            --r: 8px;
+            --r-sm: 5px;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body {
+            background: var(--bg);
+            color: var(--ink);
+            font: 14px/1.3 var(--font-body);
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+        button, input { font: inherit; color: inherit; }
+        .hidden { display: none !important; }
+
+        #stage { transform-origin: top left; }
+
+        /* ---------- Control bar ---------- */
+        .bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--line);
+            flex-wrap: wrap;
+            user-select: none;
+        }
+        .bar .spacer { flex: 1; min-width: 8px; align-self: stretch; cursor: grab; }
+
+        .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px; }
+        .seg button {
+            border: 0; background: none; padding: 3px 9px; border-radius: 4px; cursor: pointer;
+            font: 600 13px var(--font-display); letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+        }
+        .seg button.on { background: var(--accent); color: var(--accent-ink); }
+
+        .icon-btn {
+            border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--r-sm);
+            min-width: 28px; height: 28px; padding: 0 8px; cursor: pointer; color: var(--muted);
+            font: 600 13px var(--font-display); letter-spacing: .03em; text-transform: uppercase;
+            display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+        }
+        .icon-btn:hover { color: var(--ink); border-color: var(--faint); }
+        .icon-btn.on { color: var(--accent); border-color: var(--accent); }
+        .icon-btn svg { width: 14px; height: 14px; }
+
+        .search { position: relative; }
+        .search input {
+            width: 170px; height: 28px; padding: 0 9px; border-radius: var(--r-sm);
+            border: 1px solid var(--line); background: var(--bg); outline: none;
+        }
+        .search input:focus { border-color: var(--accent); }
+        .results {
+            position: absolute; z-index: 20; top: 32px; left: 0; width: 280px; max-height: 280px; overflow-y: auto;
+            margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line);
+            border-radius: var(--r-sm); box-shadow: 0 8px 24px rgba(0,0,0,.45);
+        }
+        .results li { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 4px; cursor: pointer; }
+        .results li.active { background: var(--accent-soft); }
+        .results .num { color: var(--muted); font-family: var(--font-display); }
+        .results .none { color: var(--muted); cursor: default; }
+
+        .stepper { display: inline-flex; align-items: center; gap: 4px; font: 600 13px var(--font-display); text-transform: uppercase; color: var(--muted); }
+        .stepper b { color: var(--ink); min-width: 22px; text-align: center; font-size: 16px; }
+
+        /* ---------- Header ---------- */
+        .head {
+            display: flex; align-items: baseline; gap: 10px; padding: 8px 12px 6px;
+            font-family: var(--font-display);
+        }
+        .head .label { color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+        .head .name { font-size: 24px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+        .head .meta { margin-left: auto; color: var(--muted); font-size: 14px; letter-spacing: .04em; text-transform: uppercase; text-align: right; }
+        .head .meta b { color: var(--accent); font-weight: 600; }
+
+        /* ---------- Picker ---------- */
+        .picker { padding: 4px 10px 8px; border-bottom: 1px solid var(--line); }
+        .picker-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .picker-top .hint { color: var(--faint); font-size: 12px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 4px; max-height: 132px; overflow-y: auto; }
+        .chip {
+            display: inline-flex; align-items: center; gap: 2px; padding: 0 8px 0 0; height: 32px;
+            border: 1px solid var(--line); background: var(--surface); border-radius: 16px; cursor: pointer; font-size: 13px;
+        }
+        .chip img { width: 36px; height: 36px; margin: -2px -2px -2px 0; image-rendering: pixelated; }
+        .chip .n { color: var(--faint); font: 600 12px var(--font-display); margin-left: 3px; }
+        .chip:hover { border-color: var(--faint); }
+        .chip.picked { border-color: var(--accent); background: var(--accent-soft); }
+        .chip.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .picker .empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
+
+        /* ---------- Slots ---------- */
+        .slots { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+        .slot {
+            display: grid; grid-template-columns: 128px 1fr; gap: 8px; align-items: start;
+            background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 6px;
+        }
+        .slot.blank { display: flex; align-items: center; justify-content: center; min-height: 36px; color: var(--faint); border-style: dashed; background: none; font-size: 13px; }
+        .mon { position: relative; text-align: center; padding-top: 2px; }
+        .mon img { width: 80px; height: 80px; image-rendering: pixelated; display: block; margin: -8px auto -6px; }
+        .mon .sp { font: 700 18px var(--font-display); letter-spacing: .02em; }
+        .types { display: flex; justify-content: center; gap: 3px; margin: 2px 0 3px; }
+        .type {
+            font: 700 10px var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: #fff;
+            padding: 1px 6px; border-radius: 3px; text-shadow: 0 1px 1px rgba(0,0,0,.35);
+        }
+        .mon .ab { color: var(--warn); font-size: 12px; line-height: 1.25; }
+        .mon .x {
+            position: absolute; top: -2px; right: -2px; border: 0; background: none; color: var(--faint);
+            cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px;
+        }
+        .mon .x:hover { color: var(--danger); }
+
+        .sets { display: grid; gap: 5px; }
+        .set {
+            background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+            padding: 5px; cursor: pointer; transition: opacity .12s, border-color .12s; min-width: 0;
+        }
+        .set:hover { border-color: var(--faint); }
+        .set.locked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+        .set.out { opacity: .28; }
+        .set.maybe { opacity: .62; }
+        .set-top { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; font-family: var(--font-display); }
+        .set-top .no { font-weight: 700; font-size: 17px; line-height: 1; }
+        .set-top .ev { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .04em; white-space: nowrap; }
+        .set-sub { display: flex; gap: 6px; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; }
+        .set-sub span { overflow: hidden; text-overflow: ellipsis; }
+        .set-sub .item { color: var(--ink); }
+        .set-sub .ab { color: var(--warn); }
+        .set-sub .iv { margin-left: auto; flex: none; color: var(--faint); }
+        .unk { color: var(--faint); font-style: italic; }
+        .moves { display: grid; gap: 3px; }
+        .move {
+            position: relative; display: block; width: 100%; text-align: left; border: 0; cursor: pointer;
+            padding: 3px 7px; border-radius: 4px; font-size: 13px; font-weight: 600; color: #fff;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 1px rgba(0,0,0,.4);
+        }
+        .move.revealed { box-shadow: 0 0 0 2px #fff inset; }
+        .move.revealed::after { content: '✓'; position: absolute; right: 6px; }
+        .move.blank { background: none; border: 1px dashed var(--line); color: var(--faint); font-weight: 500; font-style: italic; cursor: default; text-shadow: none; }
+        .set.ghost { cursor: default; display: flex; flex-direction: column; justify-content: center; text-align: center; min-height: 120px; color: var(--muted); font-size: 12.5px; border-style: dashed; background: none; }
+        .set.ghost .no { font: 700 17px var(--font-display); color: var(--ink); margin-bottom: 4px; }
+
+        .note { padding: 0 12px 8px; color: var(--faint); font-size: 11.5px; }
+        .foot { display: flex; gap: 10px; padding: 0 12px 10px; color: var(--faint); font-size: 11.5px; }
+        .foot .warn { color: var(--warn); }
+        .update { border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft); }
+        .status { padding: 24px; color: var(--muted); text-align: center; }
+
+        /* Type colours */
+        .t-Normal{background:#9a9a78}.t-Fire{background:#e0742e}.t-Water{background:#5b84e3}.t-Electric{background:#d8b322}
+        .t-Grass{background:#5fae45}.t-Ice{background:#6fc2c0}.t-Fighting{background:#b8302a}.t-Poison{background:#9443a0}
+        .t-Ground{background:#cfa94e}.t-Flying{background:#8e79e0}.t-Psychic{background:#e8527f}.t-Bug{background:#94a520}
+        .t-Rock{background:#ad9535}.t-Ghost{background:#6a5594}.t-Dragon{background:#6236ee}.t-Dark{background:#6b5547}
+        .t-Steel{background:#9a9ab8}.t-Unknown{background:#4a5552}
+    </style>
+</head>
+<body>
+<div id="stage">
+    <!-- Controls. Empty parts of the bar drag the window. -->
+    <div class="bar" id="bar" data-tauri-drag-region>
+        <div class="seg" id="facilitySeg">
+            <button data-v="tower">Tower</button>
+            <button data-v="factory">Factory</button>
+        </div>
+        <div class="seg" id="formatSeg">
+            <button data-v="singles">Singles</button>
+            <button data-v="doubles">Doubles</button>
+        </div>
+
+        <div class="search" id="trainerBox">
+            <input id="trainerInput" placeholder="NPC name, class or #" autocomplete="off" spellcheck="false">
+            <ul class="results hidden" id="trainerResults" role="listbox"></ul>
+        </div>
+
+        <div id="factoryBox" class="hidden" style="display:flex;gap:8px;align-items:center">
+            <div class="seg" id="levelSeg">
+                <button data-v="50">Lv 50</button>
+                <button data-v="100">Lv 100</button>
+            </div>
+            <div class="stepper">Round
+                <button class="icon-btn" id="roundDown" title="Previous round">−</button>
+                <b id="roundNum">1</b>
+                <button class="icon-btn" id="roundUp" title="Next round">+</button>
+            </div>
+        </div>
+
+        <span class="spacer" data-tauri-drag-region></span>
+        <button class="icon-btn update hidden" id="updateBtn" title="A newer version is available">Update</button>
+        <button class="icon-btn" id="clearBtn" title="Clear the picked Pokémon (Esc)">Clear</button>
+        <button class="icon-btn" id="pickerBtn" title="Show or hide the Pokémon picker">Picker</button>
+        <button class="icon-btn" id="zoomOut" title="Smaller">A−</button>
+        <button class="icon-btn" id="zoomIn" title="Larger">A+</button>
+        <span id="appBtns" class="hidden" style="display:inline-flex;gap:4px">
+            <button class="icon-btn" id="pinBtn" title="Keep on top of other windows">Pin</button>
+            <button class="icon-btn" id="minBtn" title="Minimise">_</button>
+            <button class="icon-btn" id="closeBtn" title="Close">✕</button>
+        </span>
+    </div>
+
+    <div class="head" id="head"></div>
+
+    <div class="picker" id="picker">
+        <div class="picker-top">
+            <div class="search"><input id="monInput" placeholder="Add Pokémon…" autocomplete="off" spellcheck="false"></div>
+            <span class="hint" id="pickerHint"></span>
+        </div>
+        <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="slots" id="slots"><div class="status">Loading data…</div></div>
+    <div class="note" id="note"></div>
+    <div class="foot" id="foot"></div>
+</div>
+
+<script>
+// ============================================================
+// Setup
+// ============================================================
+const TAURI = window.__TAURI__ || null;             // present inside the desktop app
+const appWindow = TAURI ? TAURI.window.getCurrentWindow() : null;
+
+// The site is the single source of data. Each successful download is cached, so the app
+// still works offline; data/ holds a snapshot bundled at build time for a first offline start.
+const SITE_DATA = 'https://pokefrontier.egpr.cloud/data/';
+const RELEASES_API = 'https://api.github.com/repos/nthGP/pokefrontier-overlay/releases/latest';
+const SPRITE = id => `https://veekun.com/dex/media/pokemon/main-sprites/diamond-pearl/${id}.png`;
+
+// Battle Tower: IVs are fixed by trainer number
+const TOWER_TIERS = [[100, 9], [120, 12], [140, 15], [160, 18], [180, 21], [200, 25], [220, 28], [300, 31]];
+
+// Battle Factory: which IV tiers each round draws from (facility_notes.md, "Reported")
+const POOL3 = [18, 21, 25, 28, 31];
+const FACTORY_ROUNDS = {
+    50:  [[9, 12], [12], [15], [18], [21], [25], [25, 28], POOL3],
+    100: [[18], [21], [25], [25, 28], POOL3, POOL3, POOL3, POOL3],
+};
+const FACTORY_MAX_ROUND = 8;   // round 8 means "8 and later"
+
+let trainers = [], sets = [], dex = { moves: {}, species: {} }, idMap = {};
+let setsBySpecies = new Map();
+
+const DEFAULT_STATE = {
+    facility: 'tower', format: 'singles',
+    trainerId: null,
+    level: 50, round: 1,
+    picks: [],           // [{ species, locked: setId|null, revealed: [move names] }]
+    showPicker: true, zoom: 1,
+};
+let state = loadState();
+
+function loadState() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('overlayState') || 'null');
+        if (saved) return { ...DEFAULT_STATE, ...saved };
+    } catch (e) {}
+    return { ...DEFAULT_STATE };
+}
+
+const norm = s => String(s || '').toLowerCase().replace(/♀/g, 'f').replace(/♂/g, 'm').replace(/[^a-z0-9]/g, '');
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const slotCount = () => state.format === 'doubles' ? 4 : 3;
+const trainerNo = t => parseInt(t.id.split('_').pop(), 10);
+const trainerIV = t => (TOWER_TIERS.find(([last]) => trainerNo(t) <= last) || [0, null])[1];
+const currentTrainer = () => trainers.find(t => t.id === state.trainerId) || null;
+
+// ============================================================
+// Data
+// ============================================================
+const dataStatus = {};   // name -> 'live' | ISO date of the cached copy | 'bundled'
+
+async function fetchWithTimeout(url, ms) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+        const r = await fetch(url, { cache: 'no-cache', signal: ctrl.signal });
+        if (!r.ok) throw new Error(`${r.status} ${url}`);
+        return await r.json();
+    } finally { clearTimeout(timer); }
+}
+
+async function loadJSON(name) {
+    try {
+        const data = await fetchWithTimeout(SITE_DATA + name, 8000);
+        try { localStorage.setItem('cache:' + name, JSON.stringify({ at: new Date().toISOString(), data })); } catch (e) {}
+        dataStatus[name] = 'live';
+        return data;
+    } catch (e) {
+        console.warn(`Couldn't download ${name}:`, e.message);
+    }
+    try {
+        const cached = JSON.parse(localStorage.getItem('cache:' + name) || 'null');
+        if (cached) { dataStatus[name] = cached.at; return cached.data; }
+    } catch (e) {}
+    const r = await fetch('data/' + name);   // snapshot bundled with the app
+    if (!r.ok) throw new Error(`No copy of ${name} available`);
+    dataStatus[name] = 'bundled';
+    return r.json();
+}
+
+async function init() {
+    applyChrome();
+    try {
+        [trainers, sets, dex, idMap] = await Promise.all([
+            loadJSON('trainers.json'), loadJSON('sets.json'),
+            loadJSON('dex.json').catch(() => dex),     // only colours; the app works without it
+            fetch('pokemon-id-map.json').then(r => r.json()).catch(() => ({})),
+        ]);
+    } catch (e) {
+        document.getElementById('slots').innerHTML = `<div class="status">Couldn't load the set data. Check your connection and restart the app.</div>`;
+        console.error(e);
+        return;
+    }
+    for (const s of sets) {
+        if (!setsBySpecies.has(s.pokemon)) setsBySpecies.set(s.pokemon, []);
+        setsBySpecies.get(s.pokemon).push(s);
+    }
+    for (const list of setsBySpecies.values()) list.sort((a, b) => a.set_id - b.set_id);
+    trainers.sort((a, b) => trainerNo(a) - trainerNo(b));
+
+    wireControls();
+    render();
+    renderFoot();
+    checkForUpdate();
+}
+
+// ============================================================
+// Which sets can the opponent's species be running?
+// Returns [{ set } | { missing: setId } | { unidentified: true }]
+// ============================================================
+function candidates(species) {
+    const all = setsBySpecies.get(species) || [];
+    if (state.facility === 'factory') {
+        const tiers = FACTORY_ROUNDS[state.level][Math.min(state.round, FACTORY_MAX_ROUND) - 1];
+        return all.filter(s => tiers.includes(s.ivs)).map(set => ({ set }));
+    }
+    const t = currentTrainer();
+    if (!t) return all.map(set => ({ set }));
+    const entries = t.pokemon_pool.filter(e => e.pokemon === species);
+    const ids = [...new Set(entries.flatMap(e => e.sets))].sort((a, b) => a - b);
+    const out = ids.map(id => {
+        const set = all.find(s => s.set_id === id);
+        return set ? { set } : { missing: id };
+    });
+    // Partly-carried 31 IV sets that haven't been matched to a sheet set yet
+    entries.filter(e => e.pool === '31iv' && e.sets.length === 0).forEach(() => out.push({ unidentified: true }));
+    return out;
+}
+
+// Species the picker offers, with how many sets each has here
+function pickerSpecies() {
+    if (state.facility === 'factory') {
+        const tiers = FACTORY_ROUNDS[state.level][Math.min(state.round, FACTORY_MAX_ROUND) - 1];
+        const out = [];
+        for (const [sp, list] of setsBySpecies) {
+            const n = list.filter(s => tiers.includes(s.ivs)).length;
+            if (n) out.push({ species: sp, n });
+        }
+        return out.sort((a, b) => a.species.localeCompare(b.species));
+    }
+    const t = currentTrainer();
+    if (!t) return [];
+    const counts = new Map();
+    for (const e of t.pokemon_pool) counts.set(e.pokemon, (counts.get(e.pokemon) || 0) + Math.max(1, e.sets.length));
+    return [...counts].map(([species, n]) => ({ species, n })).sort((a, b) => a.species.localeCompare(b.species));
+}
+
+// ============================================================
+// Rendering
+// ============================================================
+function typeBadges(species) {
+    const types = dex.species[norm(species)] || [];
+    return types.map(t => `<span class="type t-${t}">${t}</span>`).join('');
+}
+
+function evLabel(evs) {
+    if (!evs) return '';
+    const names = { hp: 'HP', atk: 'ATK', def: 'DEF', spa: 'SPA', spd: 'SPD', spe: 'SPE' };
+    const total = Object.values(evs).reduce((a, b) => a + (b || 0), 0);
+    if (!total) return '<span class="unk">EVs ?</span>';
+    return Object.entries(evs).filter(([, v]) => v >= 100).map(([k]) => names[k]).join(' / ');
+}
+
+// A set is "out" if it has 4 known moves and lacks a revealed one,
+// "maybe" if a revealed move could still be in one of its unscouted slots.
+function setFit(set, revealed) {
+    if (!revealed.length) return '';
+    const known = set.moves.filter(m => m && m.trim()).map(norm);
+    const missing = revealed.filter(m => !known.includes(norm(m)));
+    if (!missing.length) return '';
+    return missing.length <= 4 - known.length ? 'maybe' : 'out';
+}
+
+function renderSet(c, pick, idx, showAbility) {
+    if (c.unidentified) {
+        return `<div class="set ghost"><div class="no">31 IV set</div>Not identified yet</div>`;
+    }
+    if (c.missing) {
+        return `<div class="set ghost"><div class="no">Set ${c.missing}</div>Not in the sheet yet</div>`;
+    }
+    const s = c.set;
+    const cls = ['set'];
+    if (pick.locked === s.set_id) cls.push('locked');
+    else if (pick.locked != null) cls.push('out');
+    else { const fit = setFit(s, pick.revealed); if (fit) cls.push(fit); }
+
+    const moves = [0, 1, 2, 3].map(i => {
+        const m = (s.moves[i] || '').trim();
+        if (!m) return `<span class="move blank">Unknown</span>`;
+        const info = dex.moves[norm(m)];
+        const type = info ? info[0] : 'Unknown';
+        const rev = pick.revealed.some(r => norm(r) === norm(m)) ? ' revealed' : '';
+        return `<button class="move t-${type}${rev}" data-move="${esc(m)}" data-slot="${idx}" title="${esc(m)} · ${type}${info && info[2] ? ' · ' + info[2] + ' BP' : ''}">${esc(m)}</button>`;
+    }).join('');
+
+    return `<div class="${cls.join(' ')}" data-set="${s.set_id}" data-slot="${idx}">
+        <div class="set-top"><span class="no">${s.set_id}</span><span class="ev">${evLabel(s.evs)}</span></div>
+        <div class="set-sub">
+            <span class="${s.item ? 'item' : 'unk'}">${esc(s.item || 'Item ?')}</span>
+            <span class="${s.nature ? '' : 'unk'}">${esc(s.nature || 'Nature ?')}</span>
+            <span class="iv">${s.ivs != null ? s.ivs + ' IV' : ''}</span>
+        </div>
+        ${showAbility ? `<div class="set-sub"><span class="${s.ability ? 'ab' : 'unk'}">${esc(s.ability || 'Ability ?')}</span></div>` : ''}
+        <div class="moves">${moves}</div>
+    </div>`;
+}
+
+function columnsFor(n) {
+    if (n <= 4) return Math.max(n, 1);
+    return Math.min(Math.ceil(n / 2), 6);
+}
+
+function renderSlot(pick, idx) {
+    const cands = candidates(pick.species);
+    const abilities = [...new Set(cands.filter(c => c.set && c.set.ability).map(c => c.set.ability))];
+    const unknownAb = cands.some(c => !c.set || !c.set.ability);
+    const abText = abilities.length
+        ? esc(abilities.join(' / ')) + (unknownAb ? ' <span class="unk">/ ?</span>' : '')
+        : '<span class="unk">Ability ?</span>';
+    const id = idMap[pick.species];
+    const tiles = cands.length
+        ? cands.map(c => renderSet(c, pick, idx, abilities.length > 1 || (abilities.length && unknownAb))).join('')
+        : `<div class="set ghost">No sets for this Pokémon in this ${state.facility === 'factory' ? 'round' : 'pool'}</div>`;
+    return `<div class="slot">
+        <div class="mon">
+            <button class="x" data-remove="${idx}" title="Remove">×</button>
+            ${id ? `<img src="${SPRITE(id)}" alt="" onerror="this.remove()">` : ''}
+            <div class="sp">${esc(pick.species)}</div>
+            <div class="types">${typeBadges(pick.species)}</div>
+            <div class="ab">${abText}</div>
+        </div>
+        <div class="sets" style="grid-template-columns:repeat(${columnsFor(cands.length)},minmax(0,230px))">${tiles}</div>
+    </div>`;
+}
+
+function renderHead() {
+    const head = document.getElementById('head');
+    if (state.facility === 'factory') {
+        const r = Math.min(state.round, FACTORY_MAX_ROUND);
+        const tiers = FACTORY_ROUNDS[state.level][r - 1];
+        head.innerHTML = `<span class="label">Battle Factory</span>
+            <span class="name">Lv ${state.level} · Round ${r === FACTORY_MAX_ROUND ? r + '+' : r}</span>
+            <span class="meta">${state.format} · <b>${tiers.join(' / ')} IV</b></span>`;
+        return;
+    }
+    const t = currentTrainer();
+    head.innerHTML = t
+        ? `<span class="label">Opponent</span><span class="name">${esc(t.name)}</span>
+           <span class="meta">${esc(t.class)} · #${trainerNo(t)} · ${state.format} · <b>${trainerIV(t)} IV</b></span>`
+        : `<span class="label">Battle Tower</span><span class="name">Pick an opponent</span>
+           <span class="meta">${state.format}</span>`;
+}
+
+function renderPicker() {
+    const box = document.getElementById('picker');
+    box.classList.toggle('hidden', !state.showPicker);
+    const chips = document.getElementById('chips');
+    const hint = document.getElementById('pickerHint');
+    if (state.facility === 'tower' && !currentTrainer()) {
+        chips.innerHTML = `<div class="empty">Type the opponent's name above to see their pool.</div>`;
+        hint.textContent = '';
+        return;
+    }
+    const q = norm(document.getElementById('monInput').value);
+    let list = pickerSpecies();
+    const total = list.length;
+    if (q) list = list.filter(x => norm(x.species).includes(q));
+    // Factory pools are big: only show chips once you start typing, unless the pool is small
+    const tooMany = state.facility === 'factory' && !q && list.length > 60;
+    const picked = new Set(state.picks.map(p => p.species));
+    hint.textContent = `${state.picks.length}/${slotCount()} picked · ${total} species${state.facility === 'tower' ? ' in pool' : ' this round'}`;
+    chips.innerHTML = tooMany
+        ? `<div class="empty">${total} species can appear this round. Type a name to find one.</div>`
+        : list.map((x, i) => {
+            const id = idMap[x.species];
+            return `<button class="chip${picked.has(x.species) ? ' picked' : ''}${q && i === 0 ? ' active' : ''}" data-species="${esc(x.species)}">
+                ${id ? `<img src="${SPRITE(id)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}
+                ${esc(x.species)}<span class="n">${x.n}</span></button>`;
+        }).join('') || `<div class="empty">No match.</div>`;
+}
+
+function renderSlots() {
+    const box = document.getElementById('slots');
+    const n = slotCount();
+    let html = state.picks.slice(0, n).map(renderSlot).join('');
+    for (let i = state.picks.length; i < n; i++) html += `<div class="slot blank">Slot ${i + 1}: pick a Pokémon</div>`;
+    box.innerHTML = html;
+}
+
+function renderNote() {
+    const note = document.getElementById('note');
+    if (state.facility === 'factory') {
+        note.textContent = 'Factory round → IV mapping is reported, not fully confirmed in-game (Lv 100 especially). Click a move to mark it revealed; click a set to lock it.';
+    } else {
+        note.textContent = currentTrainer()
+            ? 'Set assignments come from the Emerald carry-over and are unconfirmed unless scouted. Click a move to mark it revealed; click a set to lock it.'
+            : '';
+    }
+}
+
+function render() {
+    syncControls();
+    renderHead();
+    renderPicker();
+    renderSlots();
+    renderNote();
+    applyZoom();
+}
+
+// ============================================================
+// Controls
+// ============================================================
+function commit(changes) {
+    Object.assign(state, changes || {});
+    state.picks = state.picks.slice(0, slotCount());
+    try { localStorage.setItem('overlayState', JSON.stringify(state)); } catch (e) {}
+    render();
+}
+
+function syncControls() {
+    const setSeg = (id, v) => document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('on', b.dataset.v === String(v)));
+    setSeg('facilitySeg', state.facility);
+    setSeg('formatSeg', state.format);
+    setSeg('levelSeg', state.level);
+    document.getElementById('trainerBox').classList.toggle('hidden', state.facility !== 'tower');
+    document.getElementById('factoryBox').classList.toggle('hidden', state.facility !== 'factory');
+    document.getElementById('roundNum').textContent = state.round >= FACTORY_MAX_ROUND ? FACTORY_MAX_ROUND + '+' : state.round;
+    document.getElementById('pickerBtn').classList.toggle('on', state.showPicker);
+    const t = currentTrainer();
+    const input = document.getElementById('trainerInput');
+    if (document.activeElement !== input) input.value = t ? `${t.name} #${trainerNo(t)}` : '';
+}
+
+function addPick(species) {
+    const i = state.picks.findIndex(p => p.species === species);
+    if (i >= 0) { state.picks.splice(i, 1); commit(); return; }   // clicking a picked chip removes it
+    if (state.picks.length >= slotCount()) state.picks.shift();     // full: oldest drops off
+    state.picks.push({ species, locked: null, revealed: [] });
+    commit();
+}
+
+function wireSeg(id, key, conv = v => v) {
+    document.getElementById(id).addEventListener('click', e => {
+        const b = e.target.closest('button');
+        if (b) commit({ [key]: conv(b.dataset.v) });
+    });
+}
+
+function wireControls() {
+    document.getElementById('facilitySeg').addEventListener('click', e => {
+        const b = e.target.closest('button');
+        if (b && b.dataset.v !== state.facility) commit({ facility: b.dataset.v, picks: [] });
+    });
+    wireSeg('formatSeg', 'format');
+    wireSeg('levelSeg', 'level', Number);
+    document.getElementById('roundDown').onclick = () => commit({ round: Math.max(1, state.round - 1), picks: [] });
+    document.getElementById('roundUp').onclick = () => commit({ round: Math.min(FACTORY_MAX_ROUND, state.round + 1), picks: [] });
+    document.getElementById('clearBtn').onclick = () => commit({ picks: [] });
+    document.getElementById('pickerBtn').onclick = () => commit({ showPicker: !state.showPicker });
+    document.getElementById('zoomIn').onclick = () => commit({ zoom: Math.min(1.6, +(state.zoom + 0.1).toFixed(2)) });
+    document.getElementById('zoomOut').onclick = () => commit({ zoom: Math.max(0.6, +(state.zoom - 0.1).toFixed(2)) });
+
+    wireTrainerSearch();
+
+    const monInput = document.getElementById('monInput');
+    monInput.addEventListener('input', renderPicker);
+    monInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            const first = document.querySelector('#chips .chip');
+            if (first) { addPick(first.dataset.species); monInput.value = ''; renderPicker(); }
+        }
+    });
+
+    document.getElementById('chips').addEventListener('click', e => {
+        const chip = e.target.closest('.chip');
+        if (chip) addPick(chip.dataset.species);
+    });
+
+    document.getElementById('slots').addEventListener('click', e => {
+        const rm = e.target.closest('[data-remove]');
+        if (rm) { state.picks.splice(+rm.dataset.remove, 1); commit(); return; }
+        const mv = e.target.closest('.move[data-move]');
+        if (mv) {
+            const pick = state.picks[+mv.dataset.slot];
+            const m = mv.dataset.move;
+            const i = pick.revealed.findIndex(r => norm(r) === norm(m));
+            if (i >= 0) pick.revealed.splice(i, 1); else pick.revealed.push(m);
+            commit();
+            return;
+        }
+        const set = e.target.closest('.set[data-set]');
+        if (set) {
+            const pick = state.picks[+set.dataset.slot];
+            const id = +set.dataset.set;
+            pick.locked = pick.locked === id ? null : id;
+            commit();
+        }
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !e.target.closest('input')) commit({ picks: [] });
+        if (e.ctrlKey && (e.key === '=' || e.key === '+')) { e.preventDefault(); document.getElementById('zoomIn').click(); }
+        if (e.ctrlKey && e.key === '-') { e.preventDefault(); document.getElementById('zoomOut').click(); }
+    });
+}
+
+function wireTrainerSearch() {
+    const input = document.getElementById('trainerInput');
+    const list = document.getElementById('trainerResults');
+    let matches = [], active = 0;
+
+    function show() {
+        const terms = input.value.toLowerCase().trim().split(/\s+/).filter(Boolean).map(t => t.replace(/^#/, ''));
+        matches = trainers.filter(t => {
+            const hay = `${t.name} ${t.class} ${trainerNo(t)}`.toLowerCase();
+            return terms.every(term => hay.includes(term));
+        }).slice(0, 50);
+        active = 0;
+        list.innerHTML = matches.length
+            ? matches.map((t, i) => `<li data-i="${i}" class="${i === active ? 'active' : ''}"><span>${esc(t.name)} <span class="num">${esc(t.class)}</span></span><span class="num">#${trainerNo(t)}</span></li>`).join('')
+            : '<li class="none">No trainer matches</li>';
+        list.classList.remove('hidden');
+    }
+    function pick(t) {
+        list.classList.add('hidden');
+        input.blur();
+        commit({ trainerId: t.id, picks: [] });
+        document.getElementById('monInput').focus();
+    }
+    function move(d) {
+        const items = list.querySelectorAll('li[data-i]');
+        if (!items.length) return;
+        active = (active + d + items.length) % items.length;
+        items.forEach((li, i) => li.classList.toggle('active', i === active));
+        items[active].scrollIntoView({ block: 'nearest' });
+    }
+
+    input.addEventListener('focus', () => { input.select(); show(); });
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+        else if (e.key === 'Enter' && matches[active]) { e.preventDefault(); pick(matches[active]); }
+        else if (e.key === 'Escape') { list.classList.add('hidden'); input.blur(); syncControls(); }
+    });
+    list.addEventListener('mousedown', e => {
+        const li = e.target.closest('li[data-i]');
+        if (li) { e.preventDefault(); pick(matches[+li.dataset.i]); }
+    });
+    input.addEventListener('blur', () => setTimeout(() => { list.classList.add('hidden'); syncControls(); }, 100));
+}
+
+function applyZoom() {
+    document.getElementById('stage').style.zoom = state.zoom;
+}
+
+// ============================================================
+// Footer: where the data came from
+// ============================================================
+function renderFoot() {
+    const st = dataStatus['sets.json'];
+    let text;
+    if (st === 'live') text = 'Data: live from pokefrontier.egpr.cloud';
+    else if (st === 'bundled') text = '<span class="warn">Offline: using the data bundled with the app</span>';
+    else if (st) text = `<span class="warn">Offline: using data saved ${new Date(st).toLocaleString()}</span>`;
+    else text = '';
+    document.getElementById('foot').innerHTML = text;
+}
+
+// ============================================================
+// Desktop app: window buttons, pin, update notice
+// ============================================================
+function applyChrome() {
+    if (!appWindow) return;
+    document.getElementById('appBtns').classList.remove('hidden');
+    const pin = document.getElementById('pinBtn');
+    let pinned = true;
+    try { pinned = localStorage.getItem('pinned') !== 'false'; } catch (e) {}
+    const setPin = on => {
+        pinned = on;
+        pin.classList.toggle('on', on);
+        appWindow.setAlwaysOnTop(on).catch(console.error);
+        try { localStorage.setItem('pinned', String(on)); } catch (e) {}
+    };
+    setPin(pinned);
+    pin.onclick = () => setPin(!pinned);
+    document.getElementById('minBtn').onclick = () => appWindow.minimize();
+    document.getElementById('closeBtn').onclick = () => appWindow.close();
+}
+
+// Compare "1.2.10" style versions
+function newer(a, b) {
+    const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+    for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+    return false;
+}
+
+async function checkForUpdate() {
+    if (!TAURI) return;
+    try {
+        const current = await TAURI.app.getVersion();
+        const latest = await fetchWithTimeout(RELEASES_API, 8000);
+        const tag = String(latest.tag_name || '').replace(/^v/, '');
+        if (!tag || !newer(tag, current)) return;
+        const btn = document.getElementById('updateBtn');
+        btn.textContent = `Update ${tag}`;
+        btn.title = `You have ${current}. Click to open the download page.`;
+        btn.classList.remove('hidden');
+        btn.onclick = () => TAURI.opener.openUrl(latest.html_url);
+    } catch (e) {
+        console.warn('Update check failed:', e.message);
+    }
+}
+
+init();
+</script>
+</body>
+</html>
