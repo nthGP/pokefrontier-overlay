@@ -220,7 +220,7 @@
         .team .empty-msg { color: var(--muted); font-size: 13px; padding: 6px 4px; }
 
         /* OBS: everything shrinks to fit its content instead of stretching across the source */
-        body.display #stage { width: max-content; max-width: 100vw; }
+        body.display #stage { width: max-content; }
 
         /* Dialogs (team editor, rental picker) */
         .dialog-back { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
@@ -929,8 +929,23 @@ function wireTrainerSearch() {
     input.addEventListener('blur', () => setTimeout(() => { list.classList.add('hidden'); syncControls(); }, 100));
 }
 
+// In OBS the overlay fills its Browser Source: it scales itself so the content is as big as
+// possible without being cut off (up to 1.5x). &scale=0.8 sets a fixed size instead.
+const FIXED_SCALE = parseFloat(params.get('scale')) || null;
 function applyZoom() {
-    document.getElementById('stage').style.zoom = DISPLAY ? (parseFloat(params.get('scale')) || 1) : state.zoom;
+    const stage = document.getElementById('stage');
+    if (!DISPLAY) { stage.style.zoom = state.zoom; return; }
+    if (FIXED_SCALE) { stage.style.zoom = FIXED_SCALE; return; }
+    stage.style.zoom = 1;
+    const w = stage.getBoundingClientRect().width, h = stage.scrollHeight;
+    if (!w || !h) return;
+    stage.style.zoom = Math.min(window.innerWidth / w, window.innerHeight / h, 1.5);
+}
+if (DISPLAY) {
+    window.addEventListener('resize', applyZoom);
+    // Sprites and icons arriving change the height: refit (at most a few times a second)
+    let refit = null;
+    document.addEventListener('load', () => { clearTimeout(refit); refit = setTimeout(applyZoom, 100); }, true);
 }
 
 // ============================================================
@@ -1051,7 +1066,7 @@ function openObsDialog(base) {
     ];
     document.getElementById('dialog').innerHTML = `<div class="dialog-back" id="dlgBack"><div class="dialog" role="dialog" aria-label="OBS" style="width:min(620px,100%)">
         <div class="row"><h2 class="grow">Show it in OBS</h2><button class="btn" id="dlgClose">Done</button></div>
-        <div class="hint">In OBS: Sources → + → Browser, paste an address as the URL. Keep this app open while streaming. Add <b>&amp;scale=0.8</b> to an address to shrink it.</div>
+        <div class="hint">In OBS: Sources → + → Browser, paste an address as the URL. Keep this app open while streaming. Set the source's width and height to the box it goes in: the overlay grows or shrinks to fill it.</div>
         ${rows.map(([name, url, hint], i) => `<div style="display:grid;gap:4px">
             <div class="row"><b class="grow">${name}</b><button class="btn" data-copy="${i}">Copy</button></div>
             <input type="text" readonly value="${esc(url)}" id="obsUrl${i}">
