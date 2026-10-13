@@ -37,7 +37,7 @@ When a new version is out, an **Update** button appears in the top bar.
   in the same format. Save as many teams as you like and pick one from the dropdown. Singles shows the first 3, doubles the first 4.
 - **Factory:** click **+ Add rental**, type the Pokémon and pick the set you rented (this round's sets come first).
   Click a rental to swap it after a battle.
-- Teams are saved on your PC. PokeMMO's renamed items (e.g. Assault Gear) get the right icon.
+- Teams are saved on your PC. Use the main-game item names (as in Showdown); every held item has an icon.
 
 **OBS (streaming)**
 1. In the app, click **OBS**. It copies an address like `http://127.0.0.1:7373/?view=display`.
@@ -45,6 +45,8 @@ When a new version is out, an **Update** button appears in the top bar.
 3. That source now shows whatever the app shows, without the buttons and with a see-through background.
    Keep the app open while streaming; it's what feeds OBS. Add `&scale=0.8` to the end of the address to shrink it.
    **Theme → Stream panel opacity** lets your layout show through the panels.
+4. **Opponent and team in different places:** add two Browser Sources instead of one, with `&part=opponent` on the
+   first address and `&part=team` on the second. Move and size each one wherever your layout needs it.
 
 **Theme**: click **Theme** for six presets, or pick your own accent and background colours.
 
@@ -74,4 +76,4 @@ engine built into Windows and shows `src/index.html`. All the features are in th
 Building locally needs [Node.js](https://nodejs.org) and [Rust](https://rustup.rs): `npm install`, then `npm run dev`
 (opens the app) or `npm run build` (makes the installer in `src-tauri/target/release/bundle/nsis/`).
 
-Fan-made tool, not affiliated with PokeMMO. Pokémon is © Nintendo, Creatures and Game Freak. Pokémon sprites from veekun, item icons from the PokeAPI sprites repository.
+Fan-made tool, not affiliated with PokeMMO. Pokémon is © Nintendo, Creatures and Game Freak. Pokémon sprites from veekun, item icons from the PokeAPI sprites repository and Smogon's sprites (Showdown).
