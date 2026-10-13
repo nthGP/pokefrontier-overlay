@@ -49,8 +49,9 @@ engine built into Windows and shows `src/index.html`. All the features are in th
   Set *contents* change on the site nightly; the app never needs a new version for data changes.
 - **Building:** the [Build workflow](.github/workflows/build.yml) builds the installer on GitHub for every push and
   pull request (download it from the run's *Artifacts*).
-- **Releasing:** bump `version` in `src-tauri/tauri.conf.json` (and `package.json`), merge, then push a tag `v<version>`.
-  The workflow publishes a release with the installer, and the app's Update button points users to it.
+- **Releasing:** bump `version` in `src-tauri/tauri.conf.json` (and `package.json`) and merge. Then Actions → Build →
+  *Run workflow* → tick *Publish a release* → *Run workflow*. It publishes release `v<version>` with the installer,
+  and the app's Update button points users to it.
 
 Building locally needs [Node.js](https://nodejs.org) and [Rust](https://rustup.rs): `npm install`, then `npm run dev`
 (opens the app) or `npm run build` (makes the installer in `src-tauri/target/release/bundle/nsis/`).

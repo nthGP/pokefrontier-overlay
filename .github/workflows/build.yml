@@ -2,9 +2,12 @@
 #
 # - Every push and pull request: builds it and keeps the installer as a downloadable
 #   artifact on the run (Actions tab -> the run -> Artifacts). Good for testing a change.
-# - Pushing a tag like v0.2.0: also publishes a GitHub Release with the installer.
-#   That release is what users download, and what the app's "Update" button points to.
-#   The tag must match "version" in src-tauri/tauri.conf.json.
+# - Publishing a release: Actions -> Build -> "Run workflow" -> tick "Publish a release" -> Run.
+#   It builds main and publishes release v<version> (the version in src-tauri/tauri.conf.json)
+#   with the installer. That release is what users download, and what the app's "Update" button
+#   points to. Bump the version first: running it again for a version that's already released
+#   just adds the new build to that release.
+#   Pushing a tag like v0.2.0 does the same (the tag must match the version).
 name: Build
 
 on:
@@ -13,6 +16,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: Publish a release for the version in tauri.conf.json
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -46,23 +54,32 @@ jobs:
 
       - run: npm install
 
-      - name: Check the release tag matches the app version
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Work out whether this run publishes a release
+        id: release
         shell: bash
         run: |
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} doesn't match version $version in tauri.conf.json"
-            exit 1
+          tag=""
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
+              echo "::error::Tag ${GITHUB_REF_NAME} doesn't match version $version in tauri.conf.json"
+              exit 1
+            fi
+            tag="${GITHUB_REF_NAME}"
+          elif [ "${{ inputs.release }}" = "true" ]; then
+            tag="v$version"
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Release tag: ${tag:-none (build only)}"
 
       - name: Build (and publish the release on tags)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: Frontier Overlay ${{ github.ref_name }}
+          tagName: ${{ steps.release.outputs.tag }}
+          releaseName: Frontier Overlay ${{ steps.release.outputs.tag }}
+          releaseCommitish: ${{ github.sha }}
           releaseBody: |
             Download **Frontier.Overlay_*_x64-setup.exe** below and run it.
             Windows may say "Windows protected your PC" because the app isn't signed: click **More info** -> **Run anyway**.
