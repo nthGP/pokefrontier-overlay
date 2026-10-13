@@ -1,6 +1,6 @@
 [package]
 name = "frontier-overlay"
-version = "0.1.0"
+version = "0.2.0"
 description = "PokeMMO Battle Tower / Factory set lookup overlay"
 edition = "2021"
 
@@ -13,6 +13,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
+tiny_http = "0.12"
 
 [profile.release]
 codegen-units = 1
