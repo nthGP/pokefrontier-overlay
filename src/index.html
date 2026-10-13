@@ -157,6 +157,8 @@
             padding: 5px; cursor: pointer; transition: opacity .12s, border-color .12s; min-width: 0;
         }
         .set:hover { border-color: var(--faint); }
+        .set.possible { border-style: dashed; border-color: var(--faint); }
+        .partial { margin: 6px auto 0; max-width: 112px; font-size: 11.5px; line-height: 1.3; color: var(--accent); }
         .set.locked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
         .set.out { opacity: .28; }
         .set.maybe { opacity: .62; }
@@ -492,8 +494,15 @@ function candidates(species) {
         const set = all.find(s => s.set_id === id);
         return set ? { set } : { missing: id };
     });
-    // Partly-carried 31 IV sets that haven't been matched to a sheet set yet
-    entries.filter(e => e.pool === '31iv' && e.sets.length === 0).forEach(() => out.push({ unidentified: true }));
+    // Some trainers carry only some of a species' 31 IV sets, and which ones isn't known yet.
+    // Show every 31 IV set they could be (not already listed) so nothing has to be looked up elsewhere.
+    const unknown = entries.filter(e => e.pool === '31iv' && e.sets.length === 0).length;
+    if (unknown) {
+        const possible = all.filter(s => s.ivs === 31 && !ids.includes(s.set_id));
+        if (possible.length) possible.forEach(set => out.push({ set, possible: true }));
+        else for (let i = 0; i < unknown; i++) out.push({ unidentified: true });
+        out.partial = { carries: unknown, of: possible.length };
+    }
     return out;
 }
 
@@ -510,9 +519,9 @@ function pickerSpecies() {
     }
     const t = currentTrainer();
     if (!t) return [];
-    const counts = new Map();
-    for (const e of t.pokemon_pool) counts.set(e.pokemon, (counts.get(e.pokemon) || 0) + Math.max(1, e.sets.length));
-    return [...counts].map(([species, n]) => ({ species, n })).sort((a, b) => a.species.localeCompare(b.species));
+    // The number on each chip is how many set tiles that Pokémon shows
+    const species = [...new Set(t.pokemon_pool.map(e => e.pokemon))];
+    return species.map(sp => ({ species: sp, n: candidates(sp).length })).sort((a, b) => a.species.localeCompare(b.species));
 }
 
 // ============================================================
@@ -562,6 +571,7 @@ function renderSet(c, pick, idx) {
     }
     const s = c.set;
     const cls = ['set'];
+    if (c.possible) cls.push('possible');
     if (pick.locked === s.set_id) cls.push('locked');
     else if (pick.locked != null) cls.push('out');
     else { const fit = setFit(s, pick.revealed); if (fit) cls.push(fit); }
@@ -593,6 +603,10 @@ function columnsFor(n) {
 function renderSlot(pick, idx) {
     const cands = candidates(pick.species);
     const id = idMap[pick.species];
+    // "Carries 2 of these 8": the dashed tiles are the 31 IV sets it could be
+    const partial = cands.partial && cands.partial.of
+        ? `<div class="partial" title="This trainer has ${cands.partial.carries} of these ${cands.partial.of} sets; which ones isn't known yet">Carries ${cands.partial.carries} of the ${cands.partial.of} dashed sets</div>`
+        : '';
     const tiles = cands.length
         ? cands.map(c => renderSet(c, pick, idx)).join('')
         : `<div class="set ghost">No sets for this Pokémon in this ${state.facility === 'factory' ? 'round' : 'pool'}</div>`;
@@ -602,6 +616,7 @@ function renderSlot(pick, idx) {
             ${id ? `<img src="${SPRITE(id)}" alt="" onerror="this.remove()">` : ''}
             <div class="sp">${esc(pick.species)}</div>
             <div class="types">${typeBadges(pick.species)}</div>
+            ${partial}
         </div>
         <div class="sets" style="grid-template-columns:repeat(${columnsFor(cands.length)},minmax(0,230px))">${tiles}</div>
     </div>`;
