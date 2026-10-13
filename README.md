@@ -41,9 +41,11 @@ When a new version is out, an **Update** button appears in the top bar.
 
 **OBS (streaming)**
 1. In the app, click **OBS**. It copies an address like `http://127.0.0.1:7373/?view=display`.
-2. In OBS: **Sources → + → Browser**, paste the address as the URL, set the size (e.g. 1000 × 900), OK.
+2. In OBS: **Sources → + → Browser**, paste the address as the URL, set the width and height, OK.
 3. That source now shows whatever the app shows, without the buttons and with a see-through background.
-   Keep the app open while streaming; it's what feeds OBS. Add `&scale=0.8` to the end of the address to shrink it.
+   Keep the app open while streaming; it's what feeds OBS. Set the source's **width and height to the box it goes in**
+   (not a bigger size you then shrink): the overlay scales itself to fill that box without being cut off. To force a fixed
+   size instead, add `&scale=0.8` to the address.
    **Theme → Stream panel opacity** lets your layout show through the panels.
 4. **Opponent and team in different places:** add two Browser Sources instead of one, with `&part=opponent` on the
    first address and `&part=team` on the second. Move and size each one wherever your layout needs it.
