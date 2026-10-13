@@ -1030,10 +1030,19 @@ function applyZoom() {
 }
 
 // Borders and text don't shrink exactly in proportion, so check the real size and nudge down until it fits
+// Older Chromium (the one inside OBS) reports an element's size without its own zoom, newer Chromium with it:
+// compare with the size at zoom 1 to tell which, so the nudge never shrinks an overlay that already fits.
 function settle() {
     const stage = document.getElementById('stage');
+    const z0 = parseFloat(stage.style.zoom) || 1;
+    stage.style.zoom = 1;
+    const base = stage.getBoundingClientRect();
+    stage.style.zoom = z0;
     for (let i = 0; i < 4; i++) {
-        const r = stage.getBoundingClientRect();
+        const z = parseFloat(stage.style.zoom) || 1;
+        let r = stage.getBoundingClientRect();
+        const unzoomed = Math.abs(z - 1) > 0.02 && Math.abs(r.width - base.width) < Math.abs(r.width - base.width * z);
+        if (unzoomed) r = { width: r.width * z, height: r.height * z };
         const over = Math.max(r.width / window.innerWidth, r.height / window.innerHeight);
         if (over <= 1.001) break;
         stage.style.zoom = parseFloat(stage.style.zoom) / over * 0.995;
