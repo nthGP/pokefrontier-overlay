@@ -197,6 +197,70 @@
         .update { border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft); }
         .status { padding: 24px; color: var(--muted); text-align: center; }
 
+        /* ---------- Your team (bottom strip) ---------- */
+        .team { margin: 0 8px 10px; padding: 8px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: 0 2px 10px var(--shadow); }
+        body.display .team { background: var(--panel); }
+        .team-head { display: flex; align-items: center; gap: 8px; margin: 0 2px 8px; font-family: var(--font-display); }
+        .team-head .label { color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+        .team-head .name { font-size: 18px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+        .team-head .hint { margin-left: auto; color: var(--faint); font: 12px var(--font-body); }
+        .team-head select { height: 26px; border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--r-sm); padding: 0 6px; font: 600 13px var(--font-display); letter-spacing: .03em; }
+        body.display .team-head .hint, body.display .team-head select, body.display .team-head .icon-btn { display: none; }
+        .team-grid { display: grid; gap: 8px; }
+        .tm {
+            display: grid; grid-template-columns: 64px 1fr; gap: 4px 8px; align-items: center; min-width: 0;
+            background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 6px 8px 7px 4px;
+        }
+        .tm.click { cursor: pointer; }
+        .tm.click:hover { border-color: var(--accent); }
+        .tm-sprite { position: relative; width: 64px; height: 60px; }
+        .tm-sprite img.mon-img { width: 72px; height: 72px; margin: -8px -4px; image-rendering: pixelated; }
+        .tm-sprite .item-icon, .tm-sprite .unk-item { position: absolute; right: -4px; bottom: -2px; margin: 0; }
+        .tm-sprite .item-name { position: absolute; left: -2px; bottom: -6px; max-width: 70px; font-size: 10px; padding: 0 4px; border-radius: 3px; background: var(--surface-3); border: 1px solid var(--line); }
+        .tm-info { min-width: 0; }
+        .tm-name { font: 700 17px var(--font-display); letter-spacing: .02em; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tm-sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tm-sub .ab { color: var(--warn); }
+        .tm-moves { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+        .tm-moves .move { cursor: default; font-size: 12.5px; padding: 2px 6px; }
+        .tm.empty { display: flex; align-items: center; justify-content: center; min-height: 120px; border-style: dashed; background: none; color: var(--faint); cursor: pointer; font-size: 13px; }
+        .tm.empty:hover { color: var(--accent); border-color: var(--accent); }
+        .team .empty-msg { color: var(--muted); font-size: 13px; padding: 6px 4px; }
+
+        /* Dialogs (team editor, rental picker) */
+        .dialog-back { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
+        .dialog {
+            width: min(760px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--surface); color: var(--ink);
+            border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: 0 16px 40px var(--shadow); padding: 14px; display: grid; gap: 12px;
+        }
+        .dialog h2 { margin: 0; font: 700 20px var(--font-display); letter-spacing: .04em; text-transform: uppercase; }
+        .dialog .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .dialog .grow { flex: 1; }
+        .dialog input[type=text], .dialog textarea {
+            width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: var(--r-sm); padding: 6px 8px; outline: none;
+        }
+        .dialog input[type=text]:focus, .dialog textarea:focus { border-color: var(--accent); }
+        .dialog textarea { min-height: 260px; font: 12.5px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace; resize: vertical; }
+        .dialog .hint { color: var(--faint); font-size: 12px; line-height: 1.4; }
+        .dialog .warn { color: var(--warn); font-size: 12px; }
+        .editor { display: grid; grid-template-columns: 180px 1fr; gap: 12px; }
+        .team-list { display: grid; gap: 4px; align-content: start; }
+        .team-list button { text-align: left; border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--r-sm); padding: 6px 8px; cursor: pointer; }
+        .team-list button.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+        .btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--r-sm); padding: 5px 12px; cursor: pointer; font: 600 13px var(--font-display); letter-spacing: .04em; text-transform: uppercase; }
+        .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+        .btn.danger { color: var(--danger); }
+        .rental-list { display: grid; gap: 6px; }
+        .rental { display: grid; grid-template-columns: 34px 1fr; gap: 2px 8px; align-items: center; text-align: left; padding: 6px 8px;
+            border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--r-sm); cursor: pointer; }
+        .rental:hover { border-color: var(--accent); }
+        .rental.other { opacity: .55; }
+        .rental .no { font: 700 18px var(--font-display); text-align: center; grid-row: span 2; }
+        .rental .line1 { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); }
+        .rental .line1 .item-icon { width: 22px; height: 22px; margin: -3px 0; }
+        .rental .line2 { font-size: 12.5px; }
+        .chips.small .chip { height: 28px; }
+
         /* ---------- Theme panel ---------- */
         .theme-panel {
             position: absolute; z-index: 30; right: 8px; top: 44px; width: 300px; padding: 12px;
@@ -259,6 +323,7 @@
         <button class="icon-btn update hidden" id="updateBtn" title="A newer version is available">Update</button>
         <button class="icon-btn" id="clearBtn" title="Clear the picked Pokémon (Esc)">Clear</button>
         <button class="icon-btn" id="pickerBtn" title="Show or hide the Pokémon picker">Picker</button>
+        <button class="icon-btn" id="teamBtn" title="Show or hide your team at the bottom">Team</button>
         <button class="icon-btn" id="themeBtn" title="Colours">Theme</button>
         <button class="icon-btn hidden" id="obsBtn" title="Copy the address for an OBS Browser Source">OBS</button>
         <button class="icon-btn" id="zoomOut" title="Smaller">A−</button>
@@ -291,6 +356,8 @@
     </div>
 
     <div class="slots" id="slots"><div class="status">Loading data…</div></div>
+    <div class="team" id="team"></div>
+    <div id="dialog"></div>
     <div class="note" id="note"></div>
     <div class="foot" id="foot"></div>
 </div>
@@ -308,7 +375,8 @@ const appWindow = TAURI ? TAURI.window.getCurrentWindow() : null;
 // still works offline; data/ holds a snapshot bundled at build time for a first offline start.
 const SITE_DATA = 'https://pokefrontier.egpr.cloud/data/';
 const RELEASES_API = 'https://api.github.com/repos/nthGP/pokefrontier-overlay/releases/latest';
-const SPRITE = id => `https://veekun.com/dex/media/pokemon/main-sprites/diamond-pearl/${id}.png`;
+// Gen 1-4 Pokémon use Diamond/Pearl sprites; Gen 5 ones (id > 493) use Black/White
+const SPRITE = id => `https://veekun.com/dex/media/pokemon/main-sprites/${id > 493 ? 'black-white' : 'diamond-pearl'}/${id}.png`;
 
 // Battle Tower: IVs are fixed by trainer number
 const TOWER_TIERS = [[100, 9], [120, 12], [140, 15], [160, 18], [180, 21], [200, 25], [220, 28], [300, 31]];
@@ -389,6 +457,10 @@ const DEFAULT_STATE = {
     level: 50, round: 1,
     picks: [],           // [{ species, locked: setId|null, revealed: [move names] }]
     showPicker: true, zoom: 1,
+    showTeam: true,
+    teams: [],             // saved Tower teams: [{ id, name, text }] (text in Showdown format)
+    towerTeamId: null,
+    factoryTeam: [],       // rentals: [{ species, set_id }]
     theme: { ...DEFAULT_THEME },
 };
 let state = loadState();
@@ -694,6 +766,7 @@ function render() {
     renderHead();
     renderPicker();
     renderSlots();
+    renderTeam();
     renderNote();
     applyZoom();
 }
@@ -718,6 +791,7 @@ function syncControls() {
     document.getElementById('factoryBox').classList.toggle('hidden', state.facility !== 'factory');
     document.getElementById('roundNum').textContent = state.round >= FACTORY_MAX_ROUND ? FACTORY_MAX_ROUND + '+' : state.round;
     document.getElementById('pickerBtn').classList.toggle('on', state.showPicker);
+    document.getElementById('teamBtn').classList.toggle('on', state.showTeam);
     const t = currentTrainer();
     const input = document.getElementById('trainerInput');
     if (document.activeElement !== input) input.value = t ? `${t.name} #${trainerNo(t)}` : '';
@@ -749,6 +823,8 @@ function wireControls() {
     document.getElementById('roundUp').onclick = () => commit({ round: Math.min(FACTORY_MAX_ROUND, state.round + 1), picks: [] });
     document.getElementById('clearBtn').onclick = () => commit({ picks: [] });
     document.getElementById('pickerBtn').onclick = () => commit({ showPicker: !state.showPicker });
+    document.getElementById('teamBtn').onclick = () => commit({ showTeam: !state.showTeam });
+    wireTeam();
     document.getElementById('zoomIn').onclick = () => commit({ zoom: Math.min(1.6, +(state.zoom + 0.1).toFixed(2)) });
     document.getElementById('zoomOut').onclick = () => commit({ zoom: Math.max(0.6, +(state.zoom - 0.1).toFixed(2)) });
 
@@ -853,6 +929,229 @@ function applyZoom() {
 }
 
 // ============================================================
+// Your team: Tower teams are saved Showdown-format text; Factory rentals are sheet sets
+// ============================================================
+const STAT_KEYS = { hp: 'hp', atk: 'atk', def: 'def', spa: 'spa', spd: 'spd', spe: 'spe' };
+
+// Reads the usual Showdown / PokePaste export
+function parseShowdown(text) {
+    const mons = [];
+    for (const block of String(text || '').replace(/\r/g, '').split(/\n\s*\n/)) {
+        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+        if (!lines.length) continue;
+        let [head, item] = lines[0].split(/\s+@\s+/);
+        head = head.replace(/\s*\((M|F)\)\s*$/, '').trim();
+        const named = head.match(/\(([^()]+)\)\s*$/);           // "Nickname (Species)"
+        const mon = { species: (named ? named[1] : head).trim(), item: item ? item.trim() : null,
+                      ability: null, nature: null, moves: [], evs: null };
+        for (const l of lines.slice(1)) {
+            if (l.startsWith('-')) mon.moves.push(l.replace(/^-\s*/, '').trim());
+            else if (/^Ability:/i.test(l)) mon.ability = l.slice(l.indexOf(':') + 1).trim();
+            else if (/\sNature$/i.test(l)) mon.nature = l.replace(/\s+Nature$/i, '').trim();
+            else if (/^EVs:/i.test(l)) {
+                mon.evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+                for (const part of l.slice(4).split('/')) {
+                    const m = part.trim().match(/^(\d+)\s+(\w+)/);
+                    if (m && STAT_KEYS[m[2].toLowerCase()]) mon.evs[STAT_KEYS[m[2].toLowerCase()]] = +m[1];
+                }
+            }
+        }
+        mon.moves = mon.moves.slice(0, 4);
+        mons.push(mon);
+    }
+    return mons;
+}
+
+function currentTowerTeam() {
+    return state.teams.find(t => t.id === state.towerTeamId) || null;
+}
+
+function resolveTeam() {
+    if (DISPLAY) return state.myTeam || [];
+    if (state.facility === 'factory') {
+        return state.factoryTeam.slice(0, slotCount()).map(f => {
+            const set = (setsBySpecies.get(f.species) || []).find(s => s.set_id === f.set_id);
+            return set ? { species: set.pokemon, item: set.item, ability: set.ability, nature: set.nature,
+                           moves: set.moves.filter(m => m && m.trim()), setId: set.set_id } : { species: f.species, moves: [] };
+        });
+    }
+    const t = currentTowerTeam();
+    return t ? parseShowdown(t.text).slice(0, slotCount()) : [];
+}
+
+function teamTitle() {
+    if (DISPLAY) return state.teamName || '';
+    if (state.facility === 'factory') return 'Rentals';
+    const t = currentTowerTeam();
+    return t ? t.name : '';
+}
+
+function memberCard(m, i) {
+    const id = idMap[m.species];
+    const moves = [0, 1, 2, 3].map(k => {
+        const mv = (m.moves[k] || '').trim();
+        if (!mv) return `<span class="move blank">—</span>`;
+        const info = dex.moves[norm(mv)];
+        return `<span class="move t-${info ? info[0] : 'Unknown'}" title="${esc(mv)}">${esc(mv)}</span>`;
+    }).join('');
+    const sub = [m.ability ? `<span class="ab">${esc(m.ability)}</span>` : '', m.nature ? esc(m.nature) : '']
+        .filter(Boolean).join(' · ');
+    const click = !DISPLAY && state.facility === 'factory' ? ` click" data-rental="${i}" title="Click to swap this rental` : '';
+    return `<div class="tm${click}">
+        <div class="tm-sprite">${id ? `<img class="mon-img" src="${SPRITE(id)}" alt="" onerror="this.remove()">` : ''}${itemIcon(m.item)}</div>
+        <div class="tm-info"><div class="tm-name">${esc(m.species)}${m.setId ? ` <span style="color:var(--faint);font-size:13px">Set ${m.setId}</span>` : ''}</div>
+            <div class="tm-sub">${sub}</div></div>
+        <div class="tm-moves">${moves}</div>
+    </div>`;
+}
+
+function renderTeam() {
+    const box = document.getElementById('team');
+    const team = resolveTeam();
+    const show = state.showTeam && (!DISPLAY || team.length);
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const n = slotCount();
+    const factory = state.facility === 'factory';
+    let head = `<span class="label">${factory ? 'Your rentals' : 'Your team'}</span>`;
+    if (DISPLAY || factory) {
+        head += `<span class="name">${esc(teamTitle() === 'Rentals' ? '' : teamTitle())}</span>`;
+        if (factory && !DISPLAY) head += `<span class="hint">Click a Pokémon to swap it</span>`;
+    } else {
+        const opts = state.teams.map(t => `<option value="${esc(t.id)}"${t.id === state.towerTeamId ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
+        head += state.teams.length ? `<select id="teamSelect" aria-label="Team">${opts}</select>` : '';
+        head += `<span class="hint"></span><button class="icon-btn" id="editTeams">${state.teams.length ? 'Edit teams' : 'Add a team'}</button>`;
+    }
+    let cards = team.map(memberCard).join('');
+    if (factory && !DISPLAY) for (let i = team.length; i < n; i++) cards += `<div class="tm empty" data-rental="${i}">+ Add rental</div>`;
+    if (!factory && !team.length && !DISPLAY) {
+        cards = `<div class="empty-msg">No team yet. Click <b>Add a team</b> and paste it from Showdown, or type it in the same format.</div>`;
+    }
+    box.innerHTML = `<div class="team-head">${head}</div>
+        <div class="team-grid" style="grid-template-columns:repeat(${team.length || !factory ? n : n},minmax(0,1fr))">${cards}</div>`;
+}
+
+function closeDialog() { document.getElementById('dialog').innerHTML = ''; }
+
+// ---- Tower: create, edit and pick saved teams ----
+const TEAM_EXAMPLE = `Gliscor @ Toxic Orb
+Ability: Poison Heal
+EVs: 204 HP / 246 SpD / 60 Spe
+Careful Nature
+- Protect
+- Substitute
+- Toxic
+- Earthquake`;
+
+function openTeamEditor(teamId) {
+    let current = state.teams.find(t => t.id === teamId) || state.teams[0] || null;
+    const box = document.getElementById('dialog');
+    function draw() {
+        const parsed = current ? parseShowdown(current.text) : [];
+        const unknown = parsed.filter(m => !dex.species[norm(m.species)]).map(m => m.species);
+        const badMoves = parsed.flatMap(m => m.moves).filter(mv => !dex.moves[norm(mv)]);
+        box.innerHTML = `<div class="dialog-back" id="dlgBack"><div class="dialog" role="dialog" aria-label="Your teams">
+            <div class="row"><h2 class="grow">Your teams</h2><button class="btn" id="dlgClose">Done</button></div>
+            <div class="editor">
+                <div class="team-list">
+                    ${state.teams.map(t => `<button data-team="${esc(t.id)}" class="${current && t.id === current.id ? 'on' : ''}">${esc(t.name)}</button>`).join('')}
+                    <button id="newTeam">+ New team</button>
+                </div>
+                ${current ? `<div style="display:grid;gap:8px">
+                    <input type="text" id="teamName" value="${esc(current.name)}" aria-label="Team name">
+                    <textarea id="teamText" spellcheck="false" placeholder="${esc(TEAM_EXAMPLE)}">${esc(current.text)}</textarea>
+                    <div class="hint">Paste the team from Showdown (Export) or type it in the same format: one Pokémon per block, a blank line between them.
+                        ${parsed.length ? `Read ${parsed.length}: ${parsed.map(m => esc(m.species)).join(', ')}.` : ''}
+                        The overlay shows the first ${slotCount()} in ${state.format}.</div>
+                    ${unknown.length ? `<div class="warn">Not a Pokémon name: ${unknown.map(esc).join(', ')}</div>` : ''}
+                    ${badMoves.length ? `<div class="warn">Not a move name: ${badMoves.map(esc).join(', ')}</div>` : ''}
+                    <div class="row"><button class="btn primary" id="useTeam">Use this team</button><span class="grow"></span><button class="btn danger" id="delTeam">Delete team</button></div>
+                </div>` : `<div class="hint">No teams yet. Click <b>+ New team</b>.</div>`}
+            </div></div></div>`;
+        const back = document.getElementById('dlgBack');
+        back.addEventListener('mousedown', e => { if (e.target === back) { closeDialog(); render(); } });
+        document.getElementById('dlgClose').onclick = () => { closeDialog(); render(); };
+        document.getElementById('newTeam').onclick = () => {
+            const t = { id: 't' + Date.now(), name: `Team ${state.teams.length + 1}`, text: '' };
+            state.teams.push(t); current = t; commit({ towerTeamId: t.id }); draw();
+            document.getElementById('teamText').focus();
+        };
+        box.querySelectorAll('[data-team]').forEach(b => b.onclick = () => { current = state.teams.find(t => t.id === b.dataset.team); draw(); });
+        if (!current) return;
+        document.getElementById('teamName').oninput = e => { current.name = e.target.value || 'Untitled team'; commit(); };
+        document.getElementById('teamText').oninput = e => {
+            current.text = e.target.value; commit();
+            const pos = e.target.selectionStart; draw();
+            const ta = document.getElementById('teamText'); ta.focus(); ta.setSelectionRange(pos, pos);
+        };
+        document.getElementById('useTeam').onclick = () => { commit({ towerTeamId: current.id }); closeDialog(); render(); };
+        document.getElementById('delTeam').onclick = () => {
+            state.teams = state.teams.filter(t => t !== current);
+            if (state.towerTeamId === current.id) state.towerTeamId = state.teams[0] ? state.teams[0].id : null;
+            current = state.teams[0] || null; commit(); draw();
+        };
+    }
+    draw();
+}
+
+// ---- Factory: pick or swap a rental (any set; this round's tiers listed first) ----
+function openRentalPicker(slot) {
+    const box = document.getElementById('dialog');
+    const existing = state.factoryTeam[slot];
+    let species = existing ? existing.species : null;
+    const tiers = FACTORY_ROUNDS[state.level][Math.min(state.round, FACTORY_MAX_ROUND) - 1];
+    function draw() {
+        const q = norm((document.getElementById('rentalSearch') || {}).value || '');
+        const all = [...setsBySpecies.keys()].sort();
+        const list = q ? all.filter(sp => norm(sp).includes(q)).slice(0, 40) : [];
+        const setsHtml = species ? (setsBySpecies.get(species) || []).slice().sort((a, b) => tiers.includes(b.ivs) - tiers.includes(a.ivs) || a.set_id - b.set_id).map(s => `
+            <button class="rental${tiers.includes(s.ivs) ? '' : ' other'}" data-set="${s.set_id}">
+                <span class="no">${s.set_id}</span>
+                <span class="line1">${itemIcon(s.item)}${esc(s.item || 'Item ?')} · ${esc(s.nature || 'Nature ?')} · <span style="color:var(--warn)">${esc(s.ability || 'Ability ?')}</span> · ${s.ivs} IV</span>
+                <span class="line2">${s.moves.filter(Boolean).map(esc).join(' / ') || 'Moves unknown'}</span>
+            </button>`).join('') : '';
+        box.innerHTML = `<div class="dialog-back" id="dlgBack"><div class="dialog" role="dialog" aria-label="Rental">
+            <div class="row"><h2 class="grow">${existing ? `Swap ${esc(existing.species)}` : 'Add a rental'}</h2>
+                ${existing ? '<button class="btn danger" id="rmRental">Remove</button>' : ''}<button class="btn" id="dlgClose">Cancel</button></div>
+            <input type="text" id="rentalSearch" placeholder="Type the Pokémon's name…" autocomplete="off" spellcheck="false" value="${esc((document.getElementById('rentalSearch') || {}).value || '')}">
+            ${list.length ? `<div class="chips small">${list.map(sp => `<button class="chip${sp === species ? ' picked' : ''}" data-sp="${esc(sp)}">${idMap[sp] ? `<img src="${SPRITE(idMap[sp])}" alt="" onerror="this.style.visibility='hidden'">` : ''}${esc(sp)}</button>`).join('')}</div>` : ''}
+            ${species ? `<div class="hint">${esc(species)}: pick the set you rented. Sets at this round's IVs (${tiers.join('/')}) come first.</div><div class="rental-list">${setsHtml}</div>` : '<div class="hint">Type a name, pick the Pokémon, then pick its set.</div>'}
+        </div></div>`;
+        const back = document.getElementById('dlgBack');
+        back.addEventListener('mousedown', e => { if (e.target === back) closeDialog(); });
+        document.getElementById('dlgClose').onclick = closeDialog;
+        const input = document.getElementById('rentalSearch');
+        input.oninput = () => { const pos = input.selectionStart; draw(); const i2 = document.getElementById('rentalSearch'); i2.focus(); i2.setSelectionRange(pos, pos); };
+        input.onkeydown = e => { if (e.key === 'Enter' && list[0]) { species = list[0]; draw(); } };
+        box.querySelectorAll('[data-sp]').forEach(b => b.onclick = () => { species = b.dataset.sp; draw(); });
+        box.querySelectorAll('[data-set]').forEach(b => b.onclick = () => {
+            state.factoryTeam[slot] = { species, set_id: +b.dataset.set };
+            state.factoryTeam = state.factoryTeam.filter(Boolean);
+            closeDialog(); commit();
+        });
+        const rm = document.getElementById('rmRental');
+        if (rm) rm.onclick = () => { state.factoryTeam.splice(slot, 1); closeDialog(); commit(); };
+        if (!species) input.focus();
+    }
+    draw();
+}
+
+function wireTeam() {
+    document.getElementById('team').addEventListener('click', e => {
+        if (e.target.closest('#editTeams')) return openTeamEditor(state.towerTeamId);
+        const r = e.target.closest('[data-rental]');
+        if (r) openRentalPicker(+r.dataset.rental);
+    });
+    document.getElementById('team').addEventListener('change', e => {
+        if (e.target.id === 'teamSelect') commit({ towerTeamId: e.target.value });
+    });
+    // Esc closes an open dialog (and doesn't also clear the battle)
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && document.getElementById('dialog').innerHTML) { e.stopPropagation(); closeDialog(); render(); }
+    }, true);
+}
+
+// ============================================================
 // Theme panel
 // ============================================================
 function wireTheme() {
@@ -905,11 +1204,14 @@ function wireTheme() {
 // OBS: the app keeps a copy of what's on screen on a small local web page
 // (http://127.0.0.1:7373/?view=display) that OBS shows as a Browser Source.
 // ============================================================
-const MIRROR_KEYS = ['facility', 'format', 'trainerId', 'level', 'round', 'picks', 'theme'];
+const MIRROR_KEYS = ['facility', 'format', 'trainerId', 'level', 'round', 'picks', 'theme', 'showTeam'];
 
 function broadcast() {
     if (!TAURI) return;
     const payload = Object.fromEntries(MIRROR_KEYS.map(k => [k, state[k]]));
+    // OBS gets the team ready to draw, not the saved teams
+    payload.myTeam = resolveTeam();
+    payload.teamName = teamTitle();
     TAURI.core.invoke('set_overlay_state', { state: JSON.stringify(payload) }).catch(() => {});
 }
 
