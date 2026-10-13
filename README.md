@@ -32,6 +32,15 @@ When a new version is out, an **Update** button appears in the top bar.
 - **Click a set** to lock it in once you know which one it is.
 - **Esc** or **Clear** starts the next battle.
 
+**OBS (streaming)**
+1. In the app, click **OBS**. It copies an address like `http://127.0.0.1:7373/?view=display`.
+2. In OBS: **Sources → + → Browser**, paste the address as the URL, set the size (e.g. 1000 × 900), OK.
+3. That source now shows whatever the app shows, without the buttons and with a see-through background.
+   Keep the app open while streaming; it's what feeds OBS. Add `&scale=0.8` to the end of the address to shrink it.
+   **Theme → Stream panel opacity** lets your layout show through the panels.
+
+**Theme**: click **Theme** for six presets, or pick your own accent and background colours.
+
 **Window**
 - **Ctrl+Shift+F** hides or shows the overlay from anywhere, including in-game.
 - **Pin** keeps it on top of the game. This works in windowed and borderless mode, not exclusive fullscreen.
@@ -47,6 +56,8 @@ engine built into Windows and shows `src/index.html`. All the features are in th
 - **Data:** on every start the page downloads `trainers.json`, `sets.json` and `dex.json` from the site and saves a copy,
   so it keeps working offline. A snapshot is also bundled into each build for a first offline start.
   Set *contents* change on the site nightly; the app never needs a new version for data changes.
+- **OBS:** the app runs a tiny web server on `127.0.0.1` only (`src-tauri/src/obs.rs`, ports 7373–7377) that serves
+  the same page with `?view=display`. The app window sends its state there after every change; the OBS page polls it.
 - **Building:** the [Build workflow](.github/workflows/build.yml) builds the installer on GitHub for every push and
   pull request (download it from the run's *Artifacts*).
 - **Releasing:** bump `version` in `src-tauri/tauri.conf.json` (and `package.json`) and merge. Then Actions → Build →

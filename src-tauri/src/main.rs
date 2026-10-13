@@ -4,6 +4,9 @@
 // No console window behind the app on Windows (release builds)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod obs;
+
+use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -48,7 +51,13 @@ fn main() {
                 })
                 .build(),
         )
+        .invoke_handler(tauri::generate_handler![obs::set_overlay_state, obs::obs_url])
         .setup(|app| {
+            // Local page for OBS (see obs.rs)
+            let mirror = Arc::new(obs::Mirror::default());
+            app.manage(mirror.clone());
+            obs::start_server(app.handle().clone(), mirror);
+
             // If another program already owns the shortcut, the app still runs without it
             if let Err(e) = app.global_shortcut().register(toggle_shortcut()) {
                 eprintln!("Couldn't register Ctrl+Shift+F: {e}");

@@ -8,7 +8,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* The overlay is always dark: it sits over a game window or a stream layout */
+        /* Colours come from the theme (applyTheme() derives every token from a background and an
+           accent colour). These are the defaults until the page script runs. */
         :root {
             color-scheme: dark;
             --bg: #0f1513;
@@ -42,6 +43,8 @@
             overflow-x: hidden;
         }
         button, input { font: inherit; color: inherit; }
+        /* OBS view: transparent page, only the panels show */
+        body.display { background: transparent; overflow: hidden; }
         .hidden { display: none !important; }
 
         #stage { transform-origin: top left; }
@@ -54,7 +57,6 @@
             padding: 6px 8px;
             background: var(--surface);
             border-bottom: 1px solid var(--line);
-            flex-wrap: wrap;
             user-select: none;
         }
         .bar .spacer { flex: 1; min-width: 8px; align-self: stretch; cursor: grab; }
@@ -77,11 +79,14 @@
         .icon-btn svg { width: 14px; height: 14px; }
 
         .search { position: relative; }
+        #trainerBox { flex: 0 1 200px; min-width: 110px; }
         .search input {
             width: 170px; height: 28px; padding: 0 9px; border-radius: var(--r-sm);
             border: 1px solid var(--line); background: var(--bg); outline: none;
         }
         .search input:focus { border-color: var(--accent); }
+        #trainerBox input { width: 100%; }
+        .bar .seg, .bar .icon-btn { flex: none; }
         .results {
             position: absolute; z-index: 20; top: 32px; left: 0; width: 280px; max-height: 280px; overflow-y: auto;
             margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line);
@@ -104,6 +109,7 @@
         .head .name { font-size: 24px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
         .head .meta { margin-left: auto; color: var(--muted); font-size: 14px; letter-spacing: .04em; text-transform: uppercase; text-align: right; }
         .head .meta b { color: var(--accent); font-weight: 600; }
+        body.display .head { background: var(--panel); border-radius: var(--r); margin: 0 8px; }
 
         /* ---------- Picker ---------- */
         .picker { padding: 4px 10px 8px; border-bottom: 1px solid var(--line); }
@@ -122,13 +128,15 @@
         .picker .empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
 
         /* ---------- Slots ---------- */
-        .slots { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+        .slots { display: flex; flex-direction: column; gap: 12px; padding: 10px 8px; }
         .slot {
-            display: grid; grid-template-columns: 128px 1fr; gap: 8px; align-items: start;
-            background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 6px;
+            display: grid; grid-template-columns: 128px 1fr; gap: 10px; align-items: center;
+            background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 8px;
+            box-shadow: 0 2px 10px var(--shadow);
         }
+        body.display .slot { background: var(--panel); }
         .slot.blank { display: flex; align-items: center; justify-content: center; min-height: 36px; color: var(--faint); border-style: dashed; background: none; font-size: 13px; }
-        .mon { position: relative; text-align: center; padding-top: 2px; }
+        .mon { position: relative; text-align: center; align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
         .mon img { width: 80px; height: 80px; image-rendering: pixelated; display: block; margin: -8px auto -6px; }
         .mon .sp { font: 700 18px var(--font-display); letter-spacing: .02em; }
         .types { display: flex; justify-content: center; gap: 3px; margin: 2px 0 3px; }
@@ -136,12 +144,12 @@
             font: 700 10px var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: #fff;
             padding: 1px 6px; border-radius: 3px; text-shadow: 0 1px 1px rgba(0,0,0,.35);
         }
-        .mon .ab { color: var(--warn); font-size: 12px; line-height: 1.25; }
         .mon .x {
-            position: absolute; top: -2px; right: -2px; border: 0; background: none; color: var(--faint);
+            position: absolute; top: -4px; right: -4px; border: 0; background: none; color: var(--faint);
             cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px;
         }
         .mon .x:hover { color: var(--danger); }
+        body.display .mon .x { display: none; }
 
         .sets { display: grid; gap: 5px; }
         .set {
@@ -174,10 +182,31 @@
         .set.ghost .no { font: 700 17px var(--font-display); color: var(--ink); margin-bottom: 4px; }
 
         .note { padding: 0 12px 8px; color: var(--faint); font-size: 11.5px; }
+        body.display .note, body.display .foot { display: none; }
         .foot { display: flex; gap: 10px; padding: 0 12px 10px; color: var(--faint); font-size: 11.5px; }
         .foot .warn { color: var(--warn); }
         .update { border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft); }
         .status { padding: 24px; color: var(--muted); text-align: center; }
+
+        /* ---------- Theme panel ---------- */
+        .theme-panel {
+            position: absolute; z-index: 30; right: 8px; top: 44px; width: 300px; padding: 12px;
+            background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r);
+            box-shadow: 0 12px 32px var(--shadow); display: grid; gap: 12px;
+        }
+        .theme-panel h3 { margin: 0; font: 600 12px var(--font-display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+        .presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+        .preset {
+            display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; text-align: left;
+            border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--r-sm); font-size: 13px;
+        }
+        .preset.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+        .preset .sw { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 1px solid rgba(127,127,127,.4); }
+        .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+        .pick-row input[type=color] { width: 44px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
+        .pick-row input[type=range] { width: 130px; accent-color: var(--accent); }
+        .pick-row .val { color: var(--muted); font-size: 12px; min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+        .theme-panel .hint { color: var(--faint); font-size: 11.5px; line-height: 1.35; }
 
         /* Type colours */
         .t-Normal{background:#9a9a78}.t-Fire{background:#e0742e}.t-Water{background:#5b84e3}.t-Electric{background:#d8b322}
@@ -221,6 +250,8 @@
         <button class="icon-btn update hidden" id="updateBtn" title="A newer version is available">Update</button>
         <button class="icon-btn" id="clearBtn" title="Clear the picked Pokémon (Esc)">Clear</button>
         <button class="icon-btn" id="pickerBtn" title="Show or hide the Pokémon picker">Picker</button>
+        <button class="icon-btn" id="themeBtn" title="Colours">Theme</button>
+        <button class="icon-btn hidden" id="obsBtn" title="Copy the address for an OBS Browser Source">OBS</button>
         <button class="icon-btn" id="zoomOut" title="Smaller">A−</button>
         <button class="icon-btn" id="zoomIn" title="Larger">A+</button>
         <span id="appBtns" class="hidden" style="display:inline-flex;gap:4px">
@@ -228,6 +259,16 @@
             <button class="icon-btn" id="minBtn" title="Minimise">_</button>
             <button class="icon-btn" id="closeBtn" title="Close">✕</button>
         </span>
+    </div>
+
+    <div class="theme-panel hidden" id="themePanel">
+        <h3>Theme</h3>
+        <div class="presets" id="presets"></div>
+        <div class="pick-row"><label for="accentPick">Accent colour</label><input type="color" id="accentPick"></div>
+        <div class="pick-row"><label for="bgPick">Background colour</label><input type="color" id="bgPick"></div>
+        <div class="pick-row"><label for="opacityPick">Stream panel opacity</label>
+            <span style="display:flex;align-items:center;gap:6px"><input type="range" id="opacityPick" min="40" max="100" step="5"><span class="val" id="opacityVal"></span></span></div>
+        <div class="hint">Opacity only affects the OBS view: lower it to let your stream background show through.</div>
     </div>
 
     <div class="head" id="head"></div>
@@ -249,7 +290,9 @@
 // ============================================================
 // Setup
 // ============================================================
-const TAURI = window.__TAURI__ || null;             // present inside the desktop app
+const params = new URLSearchParams(location.search);
+const DISPLAY = params.get('view') === 'display';   // OBS Browser Source: read-only copy of the app window
+const TAURI = DISPLAY ? null : (window.__TAURI__ || null);   // present inside the desktop app
 const appWindow = TAURI ? TAURI.window.getCurrentWindow() : null;
 
 // The site is the single source of data. Each successful download is cached, so the app
@@ -272,12 +315,65 @@ const FACTORY_MAX_ROUND = 8;   // round 8 means "8 and later"
 let trainers = [], sets = [], dex = { moves: {}, species: {} }, idMap = {};
 let setsBySpecies = new Map();
 
+// ============================================================
+// Themes: each is a background and an accent; every other colour is derived from them
+// ============================================================
+const PRESETS = {
+    frontier: { name: 'Frontier', bg: '#0f1513', accent: '#4fc79b' },
+    tower:    { name: 'Battle Tower', bg: '#1d1013', accent: '#e9a23b' },
+    slate:    { name: 'Slate', bg: '#12161c', accent: '#7da7ff' },
+    midnight: { name: 'Midnight', bg: '#15122a', accent: '#c3a6ff' },
+    dex:      { name: 'Pokédex', bg: '#17171a', accent: '#f2555a' },
+    paper:    { name: 'Paper', bg: '#eceae4', accent: '#2f6fd6' },
+};
+const DEFAULT_THEME = { preset: 'frontier', bg: PRESETS.frontier.bg, accent: PRESETS.frontier.accent, opacity: 92 };
+
+const hexToRgb = h => { const n = parseInt(h.replace('#', ''), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const rgbToHex = c => '#' + c.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
+const mix = (a, b, t) => rgbToHex(hexToRgb(a).map((v, i) => v + (hexToRgb(b)[i] - v) * t));
+const luminance = h => {
+    const [r, g, b] = hexToRgb(h).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+function applyTheme(theme) {
+    const t = { ...DEFAULT_THEME, ...(theme || {}) };
+    const bg = t.bg, accent = t.accent;
+    const dark = luminance(bg) < 0.4;
+    // Text is tinted with the background's hue so the greys feel part of the palette
+    const ink = dark ? mix(bg, '#ffffff', 0.9) : mix(bg, '#000000', 0.86);
+    const step = x => mix(bg, ink, x);
+    const [r, g, b] = hexToRgb(bg);
+    const vars = {
+        '--bg': bg,
+        '--surface': step(0.05),
+        '--surface-2': step(0.09),
+        '--surface-3': step(0.13),
+        '--line': step(0.15),
+        '--line-strong': step(0.24),
+        '--ink': ink,
+        '--muted': step(0.62),
+        '--faint': step(0.42),
+        '--accent': accent,
+        '--accent-soft': mix(bg, accent, 0.2),
+        '--accent-ink': luminance(accent) > 0.35 ? mix(accent, '#000000', 0.85) : '#ffffff',
+        '--warn': dark ? '#e6ad4c' : '#9a6200',
+        '--danger': dark ? '#ef8a7e' : '#a3352b',
+        '--shadow': dark ? 'rgba(0,0,0,.35)' : 'rgba(0,0,0,.10)',
+        '--panel': `rgba(${r}, ${g}, ${b}, ${t.opacity / 100})`,
+    };
+    const root = document.documentElement.style;
+    for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+}
+
 const DEFAULT_STATE = {
     facility: 'tower', format: 'singles',
     trainerId: null,
     level: 50, round: 1,
     picks: [],           // [{ species, locked: setId|null, revealed: [move names] }]
     showPicker: true, zoom: 1,
+    theme: { ...DEFAULT_THEME },
 };
 let state = loadState();
 
@@ -331,6 +427,8 @@ async function loadJSON(name) {
 }
 
 async function init() {
+    if (DISPLAY) document.body.classList.add('display');
+    applyTheme(state.theme);
     applyChrome();
     try {
         [trainers, sets, dex, idMap] = await Promise.all([
@@ -350,10 +448,16 @@ async function init() {
     for (const list of setsBySpecies.values()) list.sort((a, b) => a.set_id - b.set_id);
     trainers.sort((a, b) => trainerNo(a) - trainerNo(b));
 
+    if (DISPLAY) {
+        pollMirror();
+        return;
+    }
     wireControls();
+    wireTheme();
     render();
     renderFoot();
     checkForUpdate();
+    broadcast();
 }
 
 // ============================================================
@@ -423,7 +527,7 @@ function setFit(set, revealed) {
     return missing.length <= 4 - known.length ? 'maybe' : 'out';
 }
 
-function renderSet(c, pick, idx, showAbility) {
+function renderSet(c, pick, idx) {
     if (c.unidentified) {
         return `<div class="set ghost"><div class="no">31 IV set</div>Not identified yet</div>`;
     }
@@ -452,7 +556,7 @@ function renderSet(c, pick, idx, showAbility) {
             <span class="${s.nature ? '' : 'unk'}">${esc(s.nature || 'Nature ?')}</span>
             <span class="iv">${s.ivs != null ? s.ivs + ' IV' : ''}</span>
         </div>
-        ${showAbility ? `<div class="set-sub"><span class="${s.ability ? 'ab' : 'unk'}">${esc(s.ability || 'Ability ?')}</span></div>` : ''}
+        <div class="set-sub"><span class="${s.ability ? 'ab' : 'unk'}">${esc(s.ability || 'Ability ?')}</span></div>
         <div class="moves">${moves}</div>
     </div>`;
 }
@@ -464,14 +568,9 @@ function columnsFor(n) {
 
 function renderSlot(pick, idx) {
     const cands = candidates(pick.species);
-    const abilities = [...new Set(cands.filter(c => c.set && c.set.ability).map(c => c.set.ability))];
-    const unknownAb = cands.some(c => !c.set || !c.set.ability);
-    const abText = abilities.length
-        ? esc(abilities.join(' / ')) + (unknownAb ? ' <span class="unk">/ ?</span>' : '')
-        : '<span class="unk">Ability ?</span>';
     const id = idMap[pick.species];
     const tiles = cands.length
-        ? cands.map(c => renderSet(c, pick, idx, abilities.length > 1 || (abilities.length && unknownAb))).join('')
+        ? cands.map(c => renderSet(c, pick, idx)).join('')
         : `<div class="set ghost">No sets for this Pokémon in this ${state.facility === 'factory' ? 'round' : 'pool'}</div>`;
     return `<div class="slot">
         <div class="mon">
@@ -479,7 +578,6 @@ function renderSlot(pick, idx) {
             ${id ? `<img src="${SPRITE(id)}" alt="" onerror="this.remove()">` : ''}
             <div class="sp">${esc(pick.species)}</div>
             <div class="types">${typeBadges(pick.species)}</div>
-            <div class="ab">${abText}</div>
         </div>
         <div class="sets" style="grid-template-columns:repeat(${columnsFor(cands.length)},minmax(0,230px))">${tiles}</div>
     </div>`;
@@ -499,13 +597,14 @@ function renderHead() {
     head.innerHTML = t
         ? `<span class="label">Opponent</span><span class="name">${esc(t.name)}</span>
            <span class="meta">${esc(t.class)} · #${trainerNo(t)} · ${state.format} · <b>${trainerIV(t)} IV</b></span>`
-        : `<span class="label">Battle Tower</span><span class="name">Pick an opponent</span>
+        : `<span class="label">Battle Tower</span><span class="name">${DISPLAY ? '' : 'Pick an opponent'}</span>
            <span class="meta">${state.format}</span>`;
 }
 
 function renderPicker() {
     const box = document.getElementById('picker');
-    box.classList.toggle('hidden', !state.showPicker);
+    box.classList.toggle('hidden', DISPLAY || !state.showPicker);
+    if (DISPLAY) return;
     const chips = document.getElementById('chips');
     const hint = document.getElementById('pickerHint');
     if (state.facility === 'tower' && !currentTrainer()) {
@@ -535,7 +634,7 @@ function renderSlots() {
     const box = document.getElementById('slots');
     const n = slotCount();
     let html = state.picks.slice(0, n).map(renderSlot).join('');
-    for (let i = state.picks.length; i < n; i++) html += `<div class="slot blank">Slot ${i + 1}: pick a Pokémon</div>`;
+    if (!DISPLAY) for (let i = state.picks.length; i < n; i++) html += `<div class="slot blank">Slot ${i + 1}: pick a Pokémon</div>`;
     box.innerHTML = html;
 }
 
@@ -551,7 +650,8 @@ function renderNote() {
 }
 
 function render() {
-    syncControls();
+    document.getElementById('bar').classList.toggle('hidden', DISPLAY);
+    if (!DISPLAY) syncControls();
     renderHead();
     renderPicker();
     renderSlots();
@@ -567,6 +667,7 @@ function commit(changes) {
     state.picks = state.picks.slice(0, slotCount());
     try { localStorage.setItem('overlayState', JSON.stringify(state)); } catch (e) {}
     render();
+    broadcast();
 }
 
 function syncControls() {
@@ -663,10 +764,16 @@ function wireTrainerSearch() {
 
     function show() {
         const terms = input.value.toLowerCase().trim().split(/\s+/).filter(Boolean).map(t => t.replace(/^#/, ''));
+        // Exact name first, then names starting with what's typed, then everything else that matches
+        const first = terms[0] || '';
+        const rank = t => {
+            const name = t.name.toLowerCase();
+            return name === first ? 0 : name.startsWith(first) ? 1 : 2;
+        };
         matches = trainers.filter(t => {
             const hay = `${t.name} ${t.class} ${trainerNo(t)}`.toLowerCase();
             return terms.every(term => hay.includes(term));
-        }).slice(0, 50);
+        }).sort((a, b) => rank(a) - rank(b) || trainerNo(a) - trainerNo(b)).slice(0, 50);
         active = 0;
         list.innerHTML = matches.length
             ? matches.map((t, i) => `<li data-i="${i}" class="${i === active ? 'active' : ''}"><span>${esc(t.name)} <span class="num">${esc(t.class)}</span></span><span class="num">#${trainerNo(t)}</span></li>`).join('')
@@ -703,7 +810,86 @@ function wireTrainerSearch() {
 }
 
 function applyZoom() {
-    document.getElementById('stage').style.zoom = state.zoom;
+    document.getElementById('stage').style.zoom = DISPLAY ? (parseFloat(params.get('scale')) || 1) : state.zoom;
+}
+
+// ============================================================
+// Theme panel
+// ============================================================
+function wireTheme() {
+    const panel = document.getElementById('themePanel');
+    const accent = document.getElementById('accentPick');
+    const bg = document.getElementById('bgPick');
+    const opacity = document.getElementById('opacityPick');
+
+    function sync() {
+        const t = state.theme;
+        accent.value = t.accent; bg.value = t.bg; opacity.value = t.opacity;
+        document.getElementById('opacityVal').textContent = t.opacity + '%';
+        document.getElementById('presets').innerHTML = Object.entries(PRESETS).map(([id, p]) => `
+            <button class="preset${t.preset === id ? ' on' : ''}" data-preset="${id}">
+                <span class="sw" style="background:linear-gradient(135deg, ${p.bg} 50%, ${p.accent} 50%)"></span>${esc(p.name)}
+            </button>`).join('') + `
+            <button class="preset${t.preset === 'custom' ? ' on' : ''}" disabled style="cursor:default">
+                <span class="sw" style="background:linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)"></span>Custom
+            </button>`;
+    }
+    function setTheme(patch) {
+        state.theme = { ...state.theme, ...patch };
+        applyTheme(state.theme);
+        commit();
+        sync();
+    }
+
+    document.getElementById('themeBtn').onclick = e => {
+        e.stopPropagation();
+        panel.classList.toggle('hidden');
+        document.getElementById('themeBtn').classList.toggle('on', !panel.classList.contains('hidden'));
+        sync();
+    };
+    document.addEventListener('mousedown', e => {
+        if (!panel.classList.contains('hidden') && !panel.contains(e.target) && e.target.id !== 'themeBtn') {
+            panel.classList.add('hidden');
+            document.getElementById('themeBtn').classList.remove('on');
+        }
+    });
+    document.getElementById('presets').addEventListener('click', e => {
+        const b = e.target.closest('[data-preset]');
+        if (b) { const p = PRESETS[b.dataset.preset]; setTheme({ preset: b.dataset.preset, bg: p.bg, accent: p.accent }); }
+    });
+    accent.addEventListener('input', () => setTheme({ preset: 'custom', accent: accent.value }));
+    bg.addEventListener('input', () => setTheme({ preset: 'custom', bg: bg.value }));
+    opacity.addEventListener('input', () => setTheme({ opacity: +opacity.value }));
+}
+
+// ============================================================
+// OBS: the app keeps a copy of what's on screen on a small local web page
+// (http://127.0.0.1:7373/?view=display) that OBS shows as a Browser Source.
+// ============================================================
+const MIRROR_KEYS = ['facility', 'format', 'trainerId', 'level', 'round', 'picks', 'theme'];
+
+function broadcast() {
+    if (!TAURI) return;
+    const payload = Object.fromEntries(MIRROR_KEYS.map(k => [k, state[k]]));
+    TAURI.core.invoke('set_overlay_state', { state: JSON.stringify(payload) }).catch(() => {});
+}
+
+// In OBS: ask the app for the current screen a few times a second
+let mirrorVersion = -1;
+async function pollMirror() {
+    try {
+        const r = await fetch('/state', { cache: 'no-store' });
+        const j = await r.json();
+        if (j.version !== mirrorVersion) {
+            mirrorVersion = j.version;
+            if (j.state) {
+                Object.assign(state, j.state);
+                applyTheme(state.theme);
+                render();
+            }
+        }
+    } catch (e) { /* app closed: keep the last picture */ }
+    setTimeout(pollMirror, 250);
 }
 
 // ============================================================
@@ -737,6 +923,16 @@ function applyChrome() {
     setPin(pinned);
     pin.onclick = () => setPin(!pinned);
     document.getElementById('minBtn').onclick = () => appWindow.minimize();
+    const obs = document.getElementById('obsBtn');
+    obs.classList.remove('hidden');
+    obs.onclick = async () => {
+        const url = await TAURI.core.invoke('obs_url').catch(() => null);
+        if (!url) { obs.textContent = 'OBS off'; obs.title = "The OBS link couldn't start: ports 7373-7377 are all in use."; return; }
+        try { await navigator.clipboard.writeText(url); obs.textContent = 'Copied'; }
+        catch (e) { obs.textContent = url.replace('http://', ''); }
+        obs.title = url;
+        setTimeout(() => { obs.textContent = 'OBS'; }, 2500);
+    };
     document.getElementById('closeBtn').onclick = () => appWindow.close();
 }
 
