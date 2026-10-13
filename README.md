@@ -1,7 +1,7 @@
 # Frontier Overlay
 
 A small always-on-top window for PokeMMO's Battle Tower and Battle Factory. Type the opponent's name, pick the
-Pokémon they send out, and see every set it can be running: item, nature, EVs, IVs and moves, coloured by type.
+Pokémon they send out, and see every set it can be running: item, nature, ability, EVs and moves, coloured by type.
 
 Data comes live from [pokefrontier.egpr.cloud](https://pokefrontier.egpr.cloud), the community's trainer pool and set database.
 
@@ -67,4 +67,4 @@ engine built into Windows and shows `src/index.html`. All the features are in th
 Building locally needs [Node.js](https://nodejs.org) and [Rust](https://rustup.rs): `npm install`, then `npm run dev`
 (opens the app) or `npm run build` (makes the installer in `src-tauri/target/release/bundle/nsis/`).
 
-Fan-made tool, not affiliated with PokeMMO. Pokémon is © Nintendo, Creatures and Game Freak. Sprites from veekun.
+Fan-made tool, not affiliated with PokeMMO. Pokémon is © Nintendo, Creatures and Game Freak. Pokémon sprites from veekun, item icons from the PokeAPI sprites repository.
