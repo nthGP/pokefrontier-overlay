@@ -257,6 +257,19 @@
         .sk-controls { display: flex; gap: 6px; align-items: center; }
         .sk-controls .grow { flex: 1; }
 
+        /* OBS fill mode (opponent source): the panel fills its box exactly */
+        body.display.fill #stage { display: flex; flex-direction: column; overflow: hidden; }
+        body.display.fill .head { flex: none; }
+        body.display.fill .slots { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        body.display.fill .slot { flex-basis: 0; min-height: 0; align-items: stretch; }
+        body.display.fill .slot .sets { grid-auto-rows: 1fr; min-height: 0; }
+        body.display.fill .set { display: flex; flex-direction: column; min-height: 0; }
+        body.display.fill .set .moves { flex: 1; grid-auto-rows: 1fr; min-height: 0; }
+        body.display.fill .move.blank { display: flex; align-items: center; }
+        body.display.fill .set.ghost { justify-content: center; }
+        .slot.pending { display: flex; align-items: center; justify-content: center; min-height: 170px; background: var(--panel);
+            border-style: dashed; color: var(--faint); font: 700 40px var(--font-display); opacity: .55; box-shadow: none; }
+
         /* OBS: everything shrinks to fit its content instead of stretching across the source */
         body.display #stage { width: max-content; }
 
@@ -405,6 +418,9 @@ const DISPLAY = params.get('view') === 'display';   // OBS Browser Source: read-
 // OBS can show the opponent and your team as two separate sources (&part=opponent / &part=team), placed anywhere
 const PART = DISPLAY ? (params.get('part') || 'all') : 'all';
 const showsPart = name => PART === 'all' || PART === name;
+// The opponent's own OBS source always fills its box: rows and tiles stretch into the leftover space,
+// and each Pokémon has a fixed row (3 in singles, 4 in doubles). &fill=0 turns this off.
+const FILL = DISPLAY && PART === 'opponent' && params.get('fill') !== '0';
 const TAURI = DISPLAY ? null : (window.__TAURI__ || null);   // present inside the desktop app
 const appWindow = TAURI ? TAURI.window.getCurrentWindow() : null;
 
@@ -738,7 +754,7 @@ function renderSlot(pick, idx) {
             <div class="types">${typeBadges(pick.species)}</div>
             ${partial}
         </div>
-        <div class="sets" style="grid-template-columns:repeat(${columnsFor(cands.length)},minmax(0,230px))">${tiles}</div>
+        <div class="sets" style="grid-template-columns:repeat(${columnsFor(cands.length)},minmax(0,${FILL ? '1fr' : '230px'}))">${tiles}</div>
     </div>`;
 }
 
@@ -795,6 +811,8 @@ function renderSlots() {
     const n = slotCount();
     let html = state.picks.slice(0, n).map(renderSlot).join('');
     if (!DISPLAY) for (let i = state.picks.length; i < n; i++) html += `<div class="slot blank">Slot ${i + 1}: pick a Pokémon</div>`;
+    // OBS fill mode: Pokémon not sent out yet keep their row, as a quiet placeholder
+    if (FILL && currentTrainer()) for (let i = state.picks.length; i < n; i++) html += `<div class="slot pending"><span>?</span></div>`;
     box.innerHTML = html;
     box.classList.toggle('hidden', !showsPart('opponent'));
 }
@@ -988,17 +1006,27 @@ function applyZoom() {
         // The streak panel is simple enough to blow up big; everything else stops at 1.5x
         return w && h ? Math.min(window.innerWidth / w, window.innerHeight / h, PART === 'streak' ? 4 : 1.5) : 1;
     };
-    if (!MAX_COLS) { stage.style.zoom = fit(); settle(); return; }
-    // Try a few column counts and keep the one that shows the opponent biggest
-    let best = { z: -1, c: MAX_COLS };
-    for (let c = MAX_COLS; c <= 6; c++) {
-        colCap = c; renderSlots();
-        const z = fit();
-        if (z > best.z + 0.001) best = { z, c };
+    if (FILL) { document.body.classList.remove('fill'); stage.style.width = stage.style.height = ''; }
+    if (MAX_COLS) {
+        // Try a few column counts and keep the one that shows the opponent biggest
+        let best = { z: -1, c: MAX_COLS };
+        for (let c = MAX_COLS; c <= 6; c++) {
+            colCap = c; renderSlots();
+            const z = fit();
+            if (z > best.z + 0.001) best = { z, c };
+        }
+        colCap = best.c; renderSlots();
     }
-    colCap = best.c; renderSlots();
-    stage.style.zoom = fit();
-    settle();
+    const z = fit();
+    if (!FILL) { stage.style.zoom = z; settle(); return; }
+    // Fill: keep a little slack for rounding, then size the stage to the whole box at that zoom and
+    // let each row grow in proportion to its natural height
+    const zf = z * 0.98;
+    document.querySelectorAll('#slots > .slot').forEach(el => { el.style.flexGrow = el.getBoundingClientRect().height; });
+    document.body.classList.add('fill');
+    stage.style.zoom = zf;
+    stage.style.width = (window.innerWidth / zf) + 'px';
+    stage.style.height = (window.innerHeight / zf) + 'px';
 }
 
 // Borders and text don't shrink exactly in proportion, so check the real size and nudge down until it fits

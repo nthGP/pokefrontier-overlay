@@ -49,7 +49,9 @@ When a new version is out, an **Update** button appears in the top bar.
    **Theme → Stream panel opacity** lets your layout show through the panels.
 4. **Opponent, team and streak in different places:** add a Browser Source for each, with `&part=opponent`,
    `&part=team` or `&part=streak` on the address (the OBS button lists all of them). Move and size each one wherever
-   your layout needs it. For a narrow, tall opponent column add `&cols=2` (two sets per row).
+   your layout needs it. Add `&cols=2` to the opponent's address to let it pick the number of sets per row that shows
+   it biggest. The opponent's own source always fills its box: rows and tiles stretch, each Pokémon keeps a fixed row
+   (3 in singles, 4 in doubles) and ones not sent out yet show as "?" (add `&fill=0` to turn this off).
 
 **Streak** (under your team in the app)
 - **Won +1** after each win, **Lost** (click twice) when the streak ends, **Edit** to type the streak, your PB and the WR.
