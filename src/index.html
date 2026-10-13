@@ -225,6 +225,14 @@
             background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: 0 2px 10px var(--shadow);
         }
         body.display .streak { background: var(--panel); }
+        body.display .streak { max-width: none; margin: 0; }
+        .sk-info { display: grid; gap: 6px; }
+        .streak.wide { width: 1180px; grid-template-columns: auto 1fr; align-items: center; column-gap: 36px; padding: 18px 28px; }
+        .streak.wide .sk-info { gap: 4px; }
+        .streak.wide .sk-title { font-size: 34px; }
+        .streak.wide .sk-num { font-size: 52px; }
+        .streak.wide .sk-bar { height: 40px; margin: 26px 0 28px; }
+        .streak.wide .sk-tag { font-size: 18px; }
         .sk-title { font: 700 30px/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
         .sk-format { font: 500 17px var(--font-body); color: var(--muted); }
         .sk-row { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; }
@@ -975,7 +983,8 @@ function applyZoom() {
     const fit = () => {
         stage.style.zoom = 1;
         const w = stage.getBoundingClientRect().width, h = stage.getBoundingClientRect().height;
-        return w && h ? Math.min(window.innerWidth / w, window.innerHeight / h, 1.5) : 1;
+        // The streak panel is simple enough to blow up big; everything else stops at 1.5x
+        return w && h ? Math.min(window.innerWidth / w, window.innerHeight / h, PART === 'streak' ? 4 : 1.5) : 1;
     };
     if (!MAX_COLS) { stage.style.zoom = fit(); settle(); return; }
     // Try a few column counts and keep the one that shows the opponent biggest
@@ -1001,7 +1010,7 @@ function settle() {
     }
 }
 if (DISPLAY) {
-    window.addEventListener('resize', applyZoom);
+    window.addEventListener('resize', () => { render(); });
     // Sprites and icons arriving change the height: refit (at most a few times a second)
     let refit = null;
     document.addEventListener('load', () => { clearTimeout(refit); refit = setTimeout(applyZoom, 100); }, true);
@@ -1199,10 +1208,19 @@ function renderStreak() {
         <span class="sk-tag ${cls} ${side(p)}" style="left:${p}%">${text}</span>`;
     const facility = state.facility === 'factory' ? 'Battle Factory' : 'Battle Tower';
     const format = `${state.format === 'doubles' ? 'Doubles' : 'Singles'} · Level ${state.level}`;
+    // In OBS the panel takes the shape of its Browser Source: a very long, short box gets the wide layout
+    // (info on the left, a long bar on the right); anything else keeps the stacked layout, stretched to the
+    // box's proportions so it fills it with no gap
+    const own = DISPLAY && PART === 'streak';
+    const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+    box.classList.toggle('wide', own && aspect > 5.2);
+    box.style.width = '';
     box.innerHTML = `
+        <div class="sk-info">
         <div class="sk-title">${facility}</div>
         <div class="sk-format">${format}${state.facility === 'factory' ? ` · Round ${Math.min(state.round, FACTORY_MAX_ROUND)}${state.round >= FACTORY_MAX_ROUND ? '+' : ''}` : ''}</div>
         <div class="sk-row"><span class="sk-label">Streak</span><span class="sk-num">${fmtNum(r.streak)}</span></div>
+        </div>
         <div class="sk-bar">
             <span class="sk-fill" style="width:${pct(r.streak)}%"></span>${ticks.join('')}
             ${r.pb > 0 ? label('pb', `PB ${fmtNum(r.pb)}`, pbP) : ''}
@@ -1214,6 +1232,10 @@ function renderStreak() {
             <span class="grow"></span>
             <button class="btn" id="skEdit">Edit</button>
         </div>`}`;
+    if (own && aspect <= 5.2) {
+        // Two passes: the height depends a little on the width
+        for (let i = 0; i < 2; i++) box.style.width = Math.max(380, Math.round(box.offsetHeight * aspect)) + 'px';
+    }
     if (DISPLAY) return;
     document.getElementById('skWon').onclick = () => setRecord({ streak: r.streak + 1 });
     const lost = document.getElementById('skLost');
