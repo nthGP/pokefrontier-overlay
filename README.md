@@ -32,6 +32,13 @@ When a new version is out, an **Update** button appears in the top bar.
 - **Click a set** to lock it in once you know which one it is.
 - **Esc** or **Clear** starts the next battle.
 
+**Your team** (bottom of the overlay; **Team** in the bar hides it)
+- **Tower:** click **Add a team** / **Edit teams**, give it a name and paste the team from Showdown (Export), or type it
+  in the same format. Save as many teams as you like and pick one from the dropdown. Singles shows the first 3, doubles the first 4.
+- **Factory:** click **+ Add rental**, type the Pokémon and pick the set you rented (this round's sets come first).
+  Click a rental to swap it after a battle.
+- Teams are saved on your PC. PokeMMO's renamed items (e.g. Assault Gear) get the right icon.
+
 **OBS (streaming)**
 1. In the app, click **OBS**. It copies an address like `http://127.0.0.1:7373/?view=display`.
 2. In OBS: **Sources → + → Browser**, paste the address as the URL, set the size (e.g. 1000 × 900), OK.

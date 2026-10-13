@@ -599,6 +599,11 @@ function pickerSpecies() {
 // ============================================================
 // Rendering
 // ============================================================
+// Sprite number: the bundled map first, then the site's dex numbers (covers Gen 5 and anything new)
+function spriteId(species) {
+    return idMap[species] || (dex.nums || {})[norm(species)] || null;
+}
+
 function typeBadges(species) {
     const types = dex.species[norm(species)] || [];
     return types.map(t => `<span class="type t-${t}">${t}</span>`).join('');
@@ -618,7 +623,8 @@ function evLabel(evs) {
 const ITEM_FILE = { nevermeltice: 'never-melt-ice', silverpowder: 'silver-powder', twistedspoon: 'twisted-spoon', leek: 'stick' };
 function itemIcon(item) {
     if (!item) return `<span class="item-icon unk-item" title="Item not scouted yet">?</span>`;
-    const file = ITEM_FILE[norm(item)] || item.trim().toLowerCase().replace(/'/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    // PokeMMO renames (from the site's dex.json, e.g. Assault Gear -> Assault Vest), then old spellings
+    const file = (dex.items || {})[norm(item)] || ITEM_FILE[norm(item)] || item.trim().toLowerCase().replace(/'/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     // No icon for this item yet: show its name instead
     return `<img class="item-icon" src="items/${file}.png" alt="${esc(item)}" title="${esc(item)}"
         onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'item-name', textContent: this.alt }))">`;
@@ -674,7 +680,7 @@ function columnsFor(n) {
 
 function renderSlot(pick, idx) {
     const cands = candidates(pick.species);
-    const id = idMap[pick.species];
+    const id = spriteId(pick.species);
     // "Carries 2 of these 8": the dashed tiles are the 31 IV sets it could be
     const partial = cands.partial && cands.partial.of
         ? `<div class="partial" title="This trainer has ${cands.partial.carries} of these ${cands.partial.of} sets; which ones isn't known yet">Carries ${cands.partial.carries} of the ${cands.partial.of} dashed sets</div>`
@@ -734,7 +740,7 @@ function renderPicker() {
     chips.innerHTML = tooMany
         ? `<div class="empty">${total} species can appear this round. Type a name to find one.</div>`
         : list.map((x, i) => {
-            const id = idMap[x.species];
+            const id = spriteId(x.species);
             return `<button class="chip${picked.has(x.species) ? ' picked' : ''}${q && i === 0 ? ' active' : ''}" data-species="${esc(x.species)}">
                 ${id ? `<img src="${SPRITE(id)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}
                 ${esc(x.species)}<span class="n">${x.n}</span></button>`;
@@ -987,7 +993,7 @@ function teamTitle() {
 }
 
 function memberCard(m, i) {
-    const id = idMap[m.species];
+    const id = spriteId(m.species);
     const moves = [0, 1, 2, 3].map(k => {
         const mv = (m.moves[k] || '').trim();
         if (!mv) return `<span class="move blank">—</span>`;
@@ -1114,7 +1120,7 @@ function openRentalPicker(slot) {
             <div class="row"><h2 class="grow">${existing ? `Swap ${esc(existing.species)}` : 'Add a rental'}</h2>
                 ${existing ? '<button class="btn danger" id="rmRental">Remove</button>' : ''}<button class="btn" id="dlgClose">Cancel</button></div>
             <input type="text" id="rentalSearch" placeholder="Type the Pokémon's name…" autocomplete="off" spellcheck="false" value="${esc((document.getElementById('rentalSearch') || {}).value || '')}">
-            ${list.length ? `<div class="chips small">${list.map(sp => `<button class="chip${sp === species ? ' picked' : ''}" data-sp="${esc(sp)}">${idMap[sp] ? `<img src="${SPRITE(idMap[sp])}" alt="" onerror="this.style.visibility='hidden'">` : ''}${esc(sp)}</button>`).join('')}</div>` : ''}
+            ${list.length ? `<div class="chips small">${list.map(sp => `<button class="chip${sp === species ? ' picked' : ''}" data-sp="${esc(sp)}">${spriteId(sp) ? `<img src="${SPRITE(spriteId(sp))}" alt="" onerror="this.style.visibility='hidden'">` : ''}${esc(sp)}</button>`).join('')}</div>` : ''}
             ${species ? `<div class="hint">${esc(species)}: pick the set you rented. Sets at this round's IVs (${tiers.join('/')}) come first.</div><div class="rental-list">${setsHtml}</div>` : '<div class="hint">Type a name, pick the Pokémon, then pick its set.</div>'}
         </div></div>`;
         const back = document.getElementById('dlgBack');
