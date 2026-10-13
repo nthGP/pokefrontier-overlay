@@ -267,6 +267,8 @@
         body.display.fill .set .moves { flex: 1; grid-auto-rows: 1fr; min-height: 0; }
         body.display.fill .move.blank { display: flex; align-items: center; }
         body.display.fill .set.ghost { justify-content: center; }
+        body.display.fill .team { flex: 1; min-height: 0; width: auto; }
+        body.display.fill .team .sets { height: 100%; grid-auto-rows: 1fr; min-height: 0; }
         .slot.pending { display: flex; align-items: center; justify-content: center; min-height: 170px; background: var(--panel);
             border-style: dashed; color: var(--faint); font: 700 40px var(--font-display); opacity: .55; box-shadow: none; }
 
@@ -420,7 +422,9 @@ const PART = DISPLAY ? (params.get('part') || 'all') : 'all';
 const showsPart = name => PART === 'all' || PART === name;
 // The opponent's own OBS source always fills its box: rows and tiles stretch into the leftover space,
 // and each Pokémon has a fixed row (3 in singles, 4 in doubles). &fill=0 turns this off.
-const FILL = DISPLAY && PART === 'opponent' && params.get('fill') !== '0';
+// OBS fill mode: the opponent's or the team's own source fills its box exactly (&fill=0 turns it off)
+const FILL = DISPLAY && (PART === 'opponent' || PART === 'team') && params.get('fill') !== '0';
+let teamCols = null;   // team source: tiles per row, picked by applyZoom
 const TAURI = DISPLAY ? null : (window.__TAURI__ || null);   // present inside the desktop app
 const appWindow = TAURI ? TAURI.window.getCurrentWindow() : null;
 
@@ -1007,6 +1011,17 @@ function applyZoom() {
         return w && h ? Math.min(window.innerWidth / w, window.innerHeight / h, PART === 'streak' ? 4 : 1.5) : 1;
     };
     if (FILL) { document.body.classList.remove('fill'); stage.style.width = stage.style.height = ''; }
+    if (FILL && PART === 'team') {
+        // One row or two: keep whichever shows the team biggest in this box
+        const n = resolveTeam().length;
+        let best = { z: -1, c: n };
+        for (const c of new Set([n, Math.ceil(n / 2)])) {
+            teamCols = c; renderTeam();
+            const z = fit();
+            if (z > best.z + 0.001) best = { z, c };
+        }
+        teamCols = best.c; renderTeam();
+    }
     if (MAX_COLS) {
         // Try a few column counts and keep the one that shows the opponent biggest
         let best = { z: -1, c: MAX_COLS };
@@ -1161,7 +1176,7 @@ function renderTeam() {
         cols = 1;
     }
     box.innerHTML = `${controls ? `<div class="tm-controls">${controls}</div>` : ''}
-        <div class="sets" style="grid-template-columns:repeat(${Math.max(cols, 1)},minmax(0,230px))">${cards}</div>`;
+        <div class="sets" style="grid-template-columns:repeat(${FILL && teamCols ? teamCols : Math.max(cols, 1)},minmax(0,${FILL ? '1fr' : '230px'}))">${cards}</div>`;
 }
 
 // OBS addresses: one source with everything, or two sources placed separately

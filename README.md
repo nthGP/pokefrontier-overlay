@@ -51,7 +51,8 @@ When a new version is out, an **Update** button appears in the top bar.
    `&part=team` or `&part=streak` on the address (the OBS button lists all of them). Move and size each one wherever
    your layout needs it. Add `&cols=2` to the opponent's address to let it pick the number of sets per row that shows
    it biggest. The opponent's own source always fills its box: rows and tiles stretch, each Pokémon keeps a fixed row
-   (3 in singles, 4 in doubles) and ones not sent out yet show as "?" (add `&fill=0` to turn this off).
+   (3 in singles, 4 in doubles) and ones not sent out yet show as "?". The team's own source fills its box the same way,
+   in one row or two, whichever is bigger (add `&fill=0` to either address to turn this off).
 
 **Streak** (under your team in the app)
 - **Won +1** after each win, **Lost** (click twice) when the streak ends, **Edit** to type the streak, your PB and the WR.
