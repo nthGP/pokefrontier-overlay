@@ -160,13 +160,20 @@
         .set.locked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
         .set.out { opacity: .28; }
         .set.maybe { opacity: .62; }
-        .set-top { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; font-family: var(--font-display); }
+        .set-top { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; font-family: var(--font-display); min-height: 26px; }
+        .item-icon { width: 26px; height: 26px; flex: none; image-rendering: pixelated; margin: -2px -1px -2px -3px; }
+        .unk-item { display: inline-grid; place-items: center; width: 20px; height: 20px; margin: 0 2px 0 0; border: 1px dashed var(--faint);
+            border-radius: 50%; color: var(--faint); font: 600 12px var(--font-body); }
+        .item-name { font: 500 11.5px var(--font-body); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
         .set-top .no { font-weight: 700; font-size: 17px; line-height: 1; }
-        .set-top .ev { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .04em; white-space: nowrap; }
-        .set-sub { display: flex; gap: 6px; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; }
+        .set-top .ev { margin-left: auto; color: var(--muted); font-size: 12.5px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+        .ev .sep { color: var(--faint); margin: 0 3px; font-weight: 500; }
+        .st-hp { color: var(--ev-hp); } .st-atk { color: var(--ev-atk); } .st-def { color: var(--ev-def); }
+        .st-spa { color: var(--ev-spa); } .st-spd { color: var(--ev-spd); } .st-spe { color: var(--ev-spe); }
+        .set-sub { display: flex; justify-content: space-between; gap: 6px; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; }
         .set-sub span { overflow: hidden; text-overflow: ellipsis; }
         .set-sub .item { color: var(--ink); }
-        .set-sub .ab { color: var(--warn); }
+        .set-sub .ab { color: var(--warn); text-align: right; }
         .set-sub .iv { margin-left: auto; flex: none; color: var(--faint); }
         .unk { color: var(--faint); font-style: italic; }
         .moves { display: grid; gap: 3px; }
@@ -361,6 +368,13 @@ function applyTheme(theme) {
         '--danger': dark ? '#ef8a7e' : '#a3352b',
         '--shadow': dark ? 'rgba(0,0,0,.35)' : 'rgba(0,0,0,.10)',
         '--panel': `rgba(${r}, ${g}, ${b}, ${t.opacity / 100})`,
+        // Stat colours (the usual damage-calc ones), darker on light backgrounds
+        '--ev-hp':  dark ? '#ff6b6b' : '#c62f2f',
+        '--ev-atk': dark ? '#f5ac78' : '#c0611f',
+        '--ev-def': dark ? '#fae078' : '#8f7400',
+        '--ev-spa': dark ? '#9db7f5' : '#2f5fc4',
+        '--ev-spd': dark ? '#a7db8d' : '#2f7d1f',
+        '--ev-spe': dark ? '#fa92b2' : '#b8336a',
     };
     const root = document.documentElement.style;
     for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
@@ -509,12 +523,24 @@ function typeBadges(species) {
     return types.map(t => `<span class="type t-${t}">${t}</span>`).join('');
 }
 
+// Main EV stats, each in its stat colour
 function evLabel(evs) {
     if (!evs) return '';
     const names = { hp: 'HP', atk: 'ATK', def: 'DEF', spa: 'SPA', spd: 'SPD', spe: 'SPE' };
     const total = Object.values(evs).reduce((a, b) => a + (b || 0), 0);
     if (!total) return '<span class="unk">EVs ?</span>';
-    return Object.entries(evs).filter(([, v]) => v >= 100).map(([k]) => names[k]).join(' / ');
+    return Object.entries(evs).filter(([, v]) => v >= 100)
+        .map(([k, v]) => `<span class="st-${k}" title="${v} ${names[k]} EVs">${names[k]}</span>`).join('<span class="sep">/</span>');
+}
+
+// Item icons are bundled in items/, named like PokeAPI's (old Gen 5 spellings mapped)
+const ITEM_FILE = { nevermeltice: 'never-melt-ice', silverpowder: 'silver-powder', twistedspoon: 'twisted-spoon', leek: 'stick' };
+function itemIcon(item) {
+    if (!item) return `<span class="item-icon unk-item" title="Item not scouted yet">?</span>`;
+    const file = ITEM_FILE[norm(item)] || item.trim().toLowerCase().replace(/'/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    // No icon for this item yet: show its name instead
+    return `<img class="item-icon" src="items/${file}.png" alt="${esc(item)}" title="${esc(item)}"
+        onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'item-name', textContent: this.alt }))">`;
 }
 
 // A set is "out" if it has 4 known moves and lacks a revealed one,
@@ -550,13 +576,11 @@ function renderSet(c, pick, idx) {
     }).join('');
 
     return `<div class="${cls.join(' ')}" data-set="${s.set_id}" data-slot="${idx}">
-        <div class="set-top"><span class="no">${s.set_id}</span><span class="ev">${evLabel(s.evs)}</span></div>
+        <div class="set-top">${itemIcon(s.item)}<span class="no">${s.set_id}</span><span class="ev">${evLabel(s.evs)}</span></div>
         <div class="set-sub">
-            <span class="${s.item ? 'item' : 'unk'}">${esc(s.item || 'Item ?')}</span>
             <span class="${s.nature ? '' : 'unk'}">${esc(s.nature || 'Nature ?')}</span>
-            <span class="iv">${s.ivs != null ? s.ivs + ' IV' : ''}</span>
+            <span class="${s.ability ? 'ab' : 'unk'}">${esc(s.ability || 'Ability ?')}</span>
         </div>
-        <div class="set-sub"><span class="${s.ability ? 'ab' : 'unk'}">${esc(s.ability || 'Ability ?')}</span></div>
         <div class="moves">${moves}</div>
     </div>`;
 }
