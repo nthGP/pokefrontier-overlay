@@ -47,8 +47,14 @@ When a new version is out, an **Update** button appears in the top bar.
    (not a bigger size you then shrink): the overlay scales itself to fill that box without being cut off. To force a fixed
    size instead, add `&scale=0.8` to the address.
    **Theme → Stream panel opacity** lets your layout show through the panels.
-4. **Opponent and team in different places:** add two Browser Sources instead of one, with `&part=opponent` on the
-   first address and `&part=team` on the second. Move and size each one wherever your layout needs it.
+4. **Opponent, team and streak in different places:** add a Browser Source for each, with `&part=opponent`,
+   `&part=team` or `&part=streak` on the address (the OBS button lists all of them). Move and size each one wherever
+   your layout needs it. For a narrow, tall opponent column add `&cols=2` (two sets per row).
+
+**Streak** (under your team in the app)
+- **Won +1** after each win, **Lost** (click twice) when the streak ends, **Edit** to type the streak, your PB and the WR.
+- Each facility, format and level keeps its own numbers. Passing your PB raises it.
+- In Factory the round follows the streak (7 wins per round).
 
 **Theme**: click **Theme** for six presets, or pick your own accent and background colours.
 

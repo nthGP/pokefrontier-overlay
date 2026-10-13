@@ -219,6 +219,34 @@
         .set.tm.empty:hover { color: var(--accent); border-color: var(--accent); }
         .team .empty-msg { color: var(--muted); font-size: 13px; padding: 6px 4px; }
 
+        /* ---------- Streak panel ---------- */
+        .streak {
+            display: grid; gap: 6px; margin: 0 8px 10px; width: 460px; max-width: calc(100% - 16px); padding: 12px 16px 14px;
+            background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: 0 2px 10px var(--shadow);
+        }
+        body.display .streak { background: var(--panel); }
+        .sk-title { font: 700 30px/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+        .sk-format { font: 500 17px var(--font-body); color: var(--muted); }
+        .sk-row { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; }
+        .sk-label { font: 600 15px var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+        .sk-num { font: 700 40px/1 var(--font-display); color: var(--ink); font-variant-numeric: tabular-nums; }
+        .sk-bar { position: relative; height: 26px; margin-bottom: 20px; border-radius: 4px; overflow: visible;
+            background: var(--surface-3); border: 1px solid var(--line-strong); }
+        .sk-fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px 0 0 3px; background: var(--accent); }
+        .sk-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line-strong); opacity: .9; }
+        .sk-fill + .sk-tick, .sk-tick { mix-blend-mode: normal; }
+        .sk-mark { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1px; border-radius: 2px; }
+        .sk-mark.pb { background: var(--warn); }
+        .sk-mark.wr { background: var(--ev-spe); }
+        .sk-tag { position: absolute; top: calc(100% + 5px); line-height: 1; font: 700 15px var(--font-display); letter-spacing: .06em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .sk-tag.mid { transform: translateX(-50%); }
+        .sk-tag.left { transform: translateX(calc(-100% + 2px)); }
+        .sk-tag.right { transform: translateX(-1px); }
+        .sk-tag.pb { color: var(--warn); }
+        .sk-tag.wr { color: var(--ev-spe); top: auto; bottom: calc(100% + 6px); }
+        .sk-controls { display: flex; gap: 6px; align-items: center; }
+        .sk-controls .grow { flex: 1; }
+
         /* OBS: everything shrinks to fit its content instead of stretching across the source */
         body.display #stage { width: max-content; }
 
@@ -302,11 +330,11 @@
             <ul class="results hidden" id="trainerResults" role="listbox"></ul>
         </div>
 
+        <div class="seg" id="levelSeg">
+            <button data-v="50">Lv 50</button>
+            <button data-v="100">Lv 100</button>
+        </div>
         <div id="factoryBox" class="hidden" style="display:flex;gap:8px;align-items:center">
-            <div class="seg" id="levelSeg">
-                <button data-v="50">Lv 50</button>
-                <button data-v="100">Lv 100</button>
-            </div>
             <div class="stepper">Round
                 <button class="icon-btn" id="roundDown" title="Previous round">−</button>
                 <b id="roundNum">1</b>
@@ -352,6 +380,7 @@
 
     <div class="slots" id="slots"><div class="status">Loading data…</div></div>
     <div class="team" id="team"></div>
+    <div class="streak" id="streak"></div>
     <div id="dialog"></div>
     <div class="note" id="note"></div>
     <div class="foot" id="foot"></div>
@@ -365,6 +394,7 @@ const params = new URLSearchParams(location.search);
 const DISPLAY = params.get('view') === 'display';   // OBS Browser Source: read-only copy of the app window
 // OBS can show the opponent and your team as two separate sources (&part=opponent / &part=team), placed anywhere
 const PART = DISPLAY ? (params.get('part') || 'all') : 'all';
+const showsPart = name => PART === 'all' || PART === name;
 const TAURI = DISPLAY ? null : (window.__TAURI__ || null);   // present inside the desktop app
 const appWindow = TAURI ? TAURI.window.getCurrentWindow() : null;
 
@@ -458,6 +488,7 @@ const DEFAULT_STATE = {
     teams: [],             // saved Tower teams: [{ id, name, text }] (text in Showdown format)
     towerTeamId: null,
     factoryTeam: [],       // rentals: [{ species, set_id }]
+    records: {},           // streaks: { "tower|singles|50": { streak, pb, wr } }
     theme: { ...DEFAULT_THEME },
 };
 let state = loadState();
@@ -670,9 +701,13 @@ function renderSet(c, pick, idx) {
     </div>`;
 }
 
+// OBS can cap set columns (&cols=2) so the opponent fits a narrow, tall column
+// &cols=2 is the starting point; for trainers with many sets the fit below may pick more columns
+const MAX_COLS = DISPLAY ? (parseInt(params.get('cols'), 10) || null) : null;
+let colCap = MAX_COLS;
 function columnsFor(n) {
-    if (n <= 4) return Math.max(n, 1);
-    return Math.min(Math.ceil(n / 2), 6);
+    const c = n <= 4 ? Math.max(n, 1) : Math.min(Math.ceil(n / 2), 6);
+    return colCap ? Math.min(c, colCap) : c;
 }
 
 function renderSlot(pick, idx) {
@@ -699,7 +734,7 @@ function renderSlot(pick, idx) {
 
 function renderHead() {
     const head = document.getElementById('head');
-    head.classList.toggle('hidden', PART === 'team');
+    head.classList.toggle('hidden', !showsPart('opponent'));
     if (state.facility === 'factory') {
         const r = Math.min(state.round, FACTORY_MAX_ROUND);
         const tiers = FACTORY_ROUNDS[state.level][r - 1];
@@ -751,7 +786,7 @@ function renderSlots() {
     let html = state.picks.slice(0, n).map(renderSlot).join('');
     if (!DISPLAY) for (let i = state.picks.length; i < n; i++) html += `<div class="slot blank">Slot ${i + 1}: pick a Pokémon</div>`;
     box.innerHTML = html;
-    box.classList.toggle('hidden', PART === 'team');
+    box.classList.toggle('hidden', !showsPart('opponent'));
 }
 
 function renderNote() {
@@ -772,6 +807,7 @@ function render() {
     renderPicker();
     renderSlots();
     renderTeam();
+    renderStreak();
     renderNote();
     applyZoom();
 }
@@ -936,10 +972,33 @@ function applyZoom() {
     const stage = document.getElementById('stage');
     if (!DISPLAY) { stage.style.zoom = state.zoom; return; }
     if (FIXED_SCALE) { stage.style.zoom = FIXED_SCALE; return; }
-    stage.style.zoom = 1;
-    const w = stage.getBoundingClientRect().width, h = stage.scrollHeight;
-    if (!w || !h) return;
-    stage.style.zoom = Math.min(window.innerWidth / w, window.innerHeight / h, 1.5);
+    const fit = () => {
+        stage.style.zoom = 1;
+        const w = stage.getBoundingClientRect().width, h = stage.getBoundingClientRect().height;
+        return w && h ? Math.min(window.innerWidth / w, window.innerHeight / h, 1.5) : 1;
+    };
+    if (!MAX_COLS) { stage.style.zoom = fit(); settle(); return; }
+    // Try a few column counts and keep the one that shows the opponent biggest
+    let best = { z: -1, c: MAX_COLS };
+    for (let c = MAX_COLS; c <= 6; c++) {
+        colCap = c; renderSlots();
+        const z = fit();
+        if (z > best.z + 0.001) best = { z, c };
+    }
+    colCap = best.c; renderSlots();
+    stage.style.zoom = fit();
+    settle();
+}
+
+// Borders and text don't shrink exactly in proportion, so check the real size and nudge down until it fits
+function settle() {
+    const stage = document.getElementById('stage');
+    for (let i = 0; i < 4; i++) {
+        const r = stage.getBoundingClientRect();
+        const over = Math.max(r.width / window.innerWidth, r.height / window.innerHeight);
+        if (over <= 1.001) break;
+        stage.style.zoom = parseFloat(stage.style.zoom) / over * 0.995;
+    }
 }
 if (DISPLAY) {
     window.addEventListener('resize', applyZoom);
@@ -1031,7 +1090,7 @@ function memberCard(m, i) {
 function renderTeam() {
     const box = document.getElementById('team');
     const team = resolveTeam();
-    const show = state.showTeam && PART !== 'opponent' && (!DISPLAY || team.length);
+    const show = state.showTeam && showsPart('team') && (!DISPLAY || team.length);
     box.classList.toggle('hidden', !show);
     if (!show) return;
     const n = slotCount();
@@ -1061,8 +1120,9 @@ function renderTeam() {
 function openObsDialog(base) {
     const rows = [
         ['Everything', base, 'Opponent and your team in one source.'],
-        ['Opponent only', base + '&part=opponent', 'Use with "Team only" to place them separately.'],
+        ['Opponent only', base + '&part=opponent', 'For a narrow, tall column add &cols=2 (two sets per row).'],
         ['Team only', base + '&part=team', 'Your team on its own, anywhere in your layout.'],
+        ['Streak only', base + '&part=streak', 'Facility, format and the streak bar with your PB and the WR.'],
     ];
     document.getElementById('dialog').innerHTML = `<div class="dialog-back" id="dlgBack"><div class="dialog" role="dialog" aria-label="OBS" style="width:min(620px,100%)">
         <div class="row"><h2 class="grow">Show it in OBS</h2><button class="btn" id="dlgClose">Done</button></div>
@@ -1081,6 +1141,115 @@ function openObsDialog(base) {
         catch (e) { input.select(); b.textContent = 'Press Ctrl+C'; }
         setTimeout(() => { b.textContent = 'Copy'; }, 2000);
     });
+}
+
+// ============================================================
+// Streak panel: facility, format, and a bar with the streak, PB and WR
+// ============================================================
+const recordKey = () => `${state.facility}|${state.format}|${state.level}`;
+
+function currentRecord() {
+    if (DISPLAY) return state.streakView || { streak: 0, pb: 0, wr: 0 };
+    return { streak: 0, pb: 0, wr: 0, ...(state.records[recordKey()] || {}) };
+}
+
+function setRecord(patch) {
+    const r = { ...currentRecord(), ...patch };
+    r.pb = Math.max(r.pb || 0, r.streak || 0);              // passing your PB raises it
+    state.records = { ...state.records, [recordKey()]: r };
+    const changes = {};
+    // Factory: 7 battles per round, so the round follows the streak
+    if (state.facility === 'factory') {
+        const round = Math.min(Math.floor(r.streak / 7) + 1, FACTORY_MAX_ROUND);
+        if (round !== state.round) { changes.round = round; changes.picks = []; }
+    }
+    commit(changes);
+}
+
+// Bar scale: a round number a bit above the highest of streak / PB / WR, with ticks every
+// 7 wins in Factory (one round) or a round step in Tower (10, 25, 50, 100, 250...)
+function barScale(r) {
+    const top = Math.max(r.streak, r.pb, r.wr, 1);
+    if (state.facility === 'factory' && top <= 140) {
+        const max = Math.max(7, Math.ceil((top + 1) / 7) * 7);
+        return { max, step: 7 };
+    }
+    const steps = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+    const step = steps.find(st => top * 1.05 / st <= 24) || 10000;
+    return { max: Math.ceil(top * 1.05 / step) * step || step, step };
+}
+
+const fmtNum = n => Number(n || 0).toLocaleString('en-US');
+
+function renderStreak() {
+    const box = document.getElementById('streak');
+    const show = showsPart('streak');
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const r = currentRecord();
+    const { max, step } = barScale(r);
+    const pct = v => Math.min(100, (v / max) * 100);
+    const ticks = [];
+    for (let v = step; v < max; v += step) ticks.push(`<span class="sk-tick" style="left:${pct(v)}%"></span>`);
+    // PB's label goes under the bar and WR's above it, so they never collide; near an edge the
+    // label lines up with the marker instead of centring on it
+    const pbP = pct(r.pb), wrP = pct(r.wr);
+    const side = p => p > 85 ? 'left' : p < 15 ? 'right' : 'mid';
+    const label = (cls, text, p) => `<span class="sk-mark ${cls}" style="left:${p}%"></span>
+        <span class="sk-tag ${cls} ${side(p)}" style="left:${p}%">${text}</span>`;
+    const facility = state.facility === 'factory' ? 'Battle Factory' : 'Battle Tower';
+    const format = `${state.format === 'doubles' ? 'Doubles' : 'Singles'} · Level ${state.level}`;
+    box.innerHTML = `
+        <div class="sk-title">${facility}</div>
+        <div class="sk-format">${format}${state.facility === 'factory' ? ` · Round ${Math.min(state.round, FACTORY_MAX_ROUND)}${state.round >= FACTORY_MAX_ROUND ? '+' : ''}` : ''}</div>
+        <div class="sk-row"><span class="sk-label">Streak</span><span class="sk-num">${fmtNum(r.streak)}</span></div>
+        <div class="sk-bar">
+            <span class="sk-fill" style="width:${pct(r.streak)}%"></span>${ticks.join('')}
+            ${r.pb > 0 ? label('pb', `PB ${fmtNum(r.pb)}`, pbP) : ''}
+            ${r.wr > 0 ? label('wr', `WR ${fmtNum(r.wr)}`, wrP) : ''}
+        </div>
+        ${DISPLAY ? '' : `<div class="sk-controls">
+            <button class="btn" id="skLost" title="Ends the streak (click twice)">Lost</button>
+            <button class="btn primary" id="skWon">Won +1</button>
+            <span class="grow"></span>
+            <button class="btn" id="skEdit">Edit</button>
+        </div>`}`;
+    if (DISPLAY) return;
+    document.getElementById('skWon').onclick = () => setRecord({ streak: r.streak + 1 });
+    const lost = document.getElementById('skLost');
+    lost.onclick = () => {
+        if (lost.dataset.armed) return setRecord({ streak: 0 });
+        lost.dataset.armed = '1'; lost.textContent = 'Sure? Click again';
+        lost.classList.add('danger');
+        setTimeout(() => { if (lost.isConnected) { delete lost.dataset.armed; lost.textContent = 'Lost'; lost.classList.remove('danger'); } }, 3000);
+    };
+    document.getElementById('skEdit').onclick = openStreakEditor;
+}
+
+function openStreakEditor() {
+    const r = currentRecord();
+    const facility = state.facility === 'factory' ? 'Battle Factory' : 'Battle Tower';
+    const box = document.getElementById('dialog');
+    box.innerHTML = `<div class="dialog-back" id="dlgBack"><div class="dialog" role="dialog" aria-label="Streak" style="width:min(420px,100%)">
+        <div class="row"><h2 class="grow">Streak</h2></div>
+        <div class="hint">${facility} · ${state.format === 'doubles' ? 'Doubles' : 'Singles'} · Level ${state.level}. Each facility, format and level keeps its own numbers.</div>
+        ${[['skStreak', 'Current streak', r.streak], ['skPb', 'Personal best (PB)', r.pb], ['skWr', 'World record (WR)', r.wr]].map(([id, label, v]) => `
+            <label class="row" for="${id}"><span class="grow">${label}</span>
+            <input type="text" inputmode="numeric" id="${id}" value="${v || 0}" style="width:120px;text-align:right"></label>`).join('')}
+        <div class="row"><span class="grow"></span><button class="btn" id="dlgClose">Cancel</button><button class="btn primary" id="skSave">Save</button></div>
+    </div></div>`;
+    const num = id => Math.max(0, parseInt(String(document.getElementById(id).value).replace(/\D/g, ''), 10) || 0);
+    const back = document.getElementById('dlgBack');
+    back.addEventListener('mousedown', e => { if (e.target === back) closeDialog(); });
+    document.getElementById('dlgClose').onclick = closeDialog;
+    const save = () => {
+        const streak = num('skStreak');
+        state.records = { ...state.records, [recordKey()]: { streak, pb: Math.max(num('skPb'), streak), wr: num('skWr') } };
+        closeDialog(); setRecord({});
+    };
+    document.getElementById('skSave').onclick = save;
+    back.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+    document.getElementById('skStreak').select();
 }
 
 function closeDialog() { document.getElementById('dialog').innerHTML = ''; }
@@ -1264,6 +1433,7 @@ function broadcast() {
     // OBS gets the team ready to draw, not the saved teams
     payload.myTeam = resolveTeam();
     payload.teamName = teamTitle();
+    payload.streakView = currentRecord();
     TAURI.core.invoke('set_overlay_state', { state: JSON.stringify(payload) }).catch(() => {});
 }
 
