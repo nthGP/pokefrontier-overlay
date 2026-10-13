@@ -204,6 +204,8 @@
             box-shadow: 0 2px 10px var(--shadow);
         }
         body.display .team { background: var(--panel); }
+        /* In its own OBS source the team fills the source edge to edge */
+        body.display.part-team .team { margin: 0; max-width: none; }
         .tm-controls { display: flex; align-items: center; gap: 8px; }
         .tm-hint { color: var(--muted); font: 600 12px var(--font-display); letter-spacing: .1em; text-transform: uppercase; }
         .tm-controls select { max-width: 120px; height: 26px; border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--r-sm); padding: 0 4px; font: 600 13px var(--font-display); }
@@ -551,7 +553,7 @@ async function loadJSON(name) {
 }
 
 async function init() {
-    if (DISPLAY) document.body.classList.add('display');
+    if (DISPLAY) document.body.classList.add('display', 'part-' + PART);
     applyTheme(state.theme);
     applyChrome();
     try {
