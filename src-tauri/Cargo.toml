@@ -1,6 +1,6 @@
 [package]
 name = "frontier-overlay"
-version = "0.8.0"
+version = "0.9.0"
 description = "PokeMMO Battle Tower / Factory set lookup overlay"
 edition = "2021"
 

@@ -5,7 +5,7 @@
 // like "[#ff8a00]Gulpin[#]". A long message wraps onto a following line that has no timestamp.
 //
 // Events:
-//   { type: 'challenge', trainer: 'Youngster CONNER', index: 2 }
+//   { type: 'challenge', trainer: 'Youngster CONNER', index: 2, trainers: [{ name, index }, ...] }  (2 in Multi/Co-op)
 //   { type: 'foeSentOut', index: 2, species: ['Igglybuff', 'Slugma'] }
 //   { type: 'foeMove', species: 'Gulpin', move: 'Water Pulse' }
 //   { type: 'foeItem', species: 'Crobat', item: 'Life Orb' }   (any "The foe's X ... its ITEM!" message)
@@ -41,9 +41,11 @@
         const events = [];
         for (const m of messages(lines)) {
             let r;
-            if ((r = m.match(/^You are challenged by (.+?)\[(\d+)\]!$/))) {
-                events.push({ type: 'challenge', trainer: r[1].trim(), index: +r[2] });
-            } else if ((r = m.match(/^(.+?)\[(\d+)\] has defeated (.+)!$/))) {
+            if ((r = m.match(/^You are challenged by (.+\[\d+\])!$/))) {
+                // One trainer, or two in Multi / Co-op ("A[012] and B[034]")
+                const trainers = [...r[1].matchAll(/(?:^| and )(.+?)\[(\d+)\]/g)].map(x => ({ name: x[1].trim(), index: +x[2] }));
+                events.push({ type: 'challenge', trainer: trainers[0].name, index: trainers[0].index, trainers });
+            } else if ((r = m.match(/^(.+?)\[(\d+)\] (?:has|have) defeated (.+)!$/))) {
                 events.push({ type: 'lost', index: +r[2] });
             } else if ((r = m.match(/^.+ defeated (.+?)\[(\d+)\]!$/))) {
                 events.push({ type: 'won', index: +r[2] });
