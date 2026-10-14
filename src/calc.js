@@ -23688,4 +23688,5 @@ exports.extend = extend;
 //# sourceMappingURL=util.js.map
 };
 window.Calc = load('index');
+window.Calc.getFinalSpeed = load('mechanics/util').getFinalSpeed;
 })();

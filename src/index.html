@@ -262,35 +262,73 @@
 
         /* ---------- Damage calc ---------- */
         .calc {
-            display: grid; gap: 12px; margin: 0 8px 10px; width: 760px; max-width: calc(100% - 16px); padding: 12px 16px 14px;
+            display: grid; gap: 10px; margin: 0 8px 10px; padding: 12px 14px 14px;
             background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: 0 2px 10px var(--shadow);
         }
-        body.display .calc { background: var(--panel); max-width: none; margin: 0; }
-        .cc-controls { display: grid; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
-        .cc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
-        .cc-row b { font: 600 12px var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); min-width: 52px; }
-        .cc-row select, .cc-row input[type=text] { height: 24px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
-            border-radius: var(--r-sm); padding: 0 4px; font: 600 12.5px var(--font-body); }
-        .cc-row input[type=text] { width: 40px; text-align: right; }
-        .cc-boost { display: inline-flex; align-items: center; gap: 2px; }
-        .cc-boost select { width: 44px; }
-        .cc-boost select.up { color: var(--accent); }
-        .cc-boost select.down { color: var(--warn); }
+        body.display .calc { background: var(--panel); max-width: none; margin: 0; width: 760px; gap: 12px; padding: 12px 16px 14px; }
+        .cc-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
+        .cc-title > span:first-child { font: 700 15px var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+        .calc .dim { color: var(--faint); }
+        .calc select, .calc input[type=text] { height: 24px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+            border-radius: var(--r-sm); padding: 0 4px; font: 600 12.5px var(--font-body); min-width: 0; }
+        .calc label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+        .cc-results { display: grid; gap: 10px; }
         .cc-notes { font-size: 11.5px; color: var(--faint); }
-        .cc-cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 36px; }
+        .cc-eds { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 10px; }
+        .cc-ed { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+        .cc-ed { display: grid; gap: 8px; align-content: start; padding: 10px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); }
+        .cc-ed select, .cc-ed input[type=text] { background: var(--surface); }
+        .cc-ed-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .cc-ed-head b { font: 600 12px var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+        .cc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 5px 8px; }
+        .cc-grid label { display: grid; gap: 2px; font-size: 11px; min-width: 0; }
+        .cc-grid label select, .cc-grid label input { width: 100%; }
+        .cc-stats { border-collapse: collapse; font-size: 12px; width: 100%; }
+        .cc-stats th { font: 600 11px var(--font-display); letter-spacing: .06em; color: var(--muted); text-align: left; padding: 1px 3px; }
+        .cc-stats td { padding: 1px 3px; font-variant-numeric: tabular-nums; }
+        .cc-stats td input { width: 34px; text-align: right; }
+        .cc-stats td select { width: 44px; }
+        .cc-stats td select.up { color: var(--accent); }
+        .cc-stats td select.down { color: var(--warn); }
+        .cc-stats td.val { text-align: right; white-space: nowrap; }
+        .cc-evsum { text-align: right; font-size: 11px; color: var(--faint); }
+        .cc-evsum.over { color: var(--warn); }
+        .cc-moves { display: grid; gap: 4px; grid-template-columns: minmax(0, 1fr); }
+        .cc-mv { display: flex; gap: 4px; align-items: center; }
+        .cc-mv input[type=text] { flex: 1; min-width: 0; }
+        .cc-flags { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+        .cc-ed-foot { display: flex; align-items: center; gap: 6px; }
+        .cc-edited { font-size: 11px; color: var(--warn); }
+        .cc-hint { font-size: 11.5px; color: var(--faint); }
+        .cc-cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
         .cc-col h4 { margin: 0 0 6px; font: 700 15px var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
-        .cc-list { display: grid; grid-template-columns: minmax(130px, max-content) 1fr; gap: 4px 14px; align-items: center; }
+        .cc-spe { margin-left: 6px; font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+        .cc-list { display: grid; grid-template-columns: minmax(120px, max-content) 1fr; gap: 4px 12px; align-items: center; }
         .cc-move { padding: 3px 10px; border-radius: 4px; color: #fff; font: 600 15px var(--font-body); text-align: center; white-space: nowrap;
             text-shadow: 0 1px 1px rgba(0,0,0,.35); border: 2px solid transparent; }
         .cc-move.unk { background: var(--surface-3); color: var(--faint); text-shadow: none; }
         .cc-move.sel { border-color: var(--ink); box-shadow: 0 0 0 2px var(--accent); }
         body:not(.display) .cc-move:not(.unk) { cursor: pointer; }
         .cc-pct { font: 600 16px var(--font-body); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+        .cc-pct small { font-size: 11px; color: var(--muted); }
         .cc-pct.dim { color: var(--faint); }
         .cc-pct.ko { color: var(--accent); }
-        .cc-head { font: 700 17px/1.3 var(--font-body); color: var(--ink); }
+        .cc-head { font: 700 16px/1.3 var(--font-body); color: var(--ink); }
+        body.display .cc-head { font-size: 17px; }
         .cc-rolls { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
         .cc-empty { color: var(--muted); font-size: 13px; }
+        .set.in-calc, .set.tm.in-calc { outline: 2px dashed var(--accent); outline-offset: 2px; }
+
+        /* ---------- App layout: battle on the left, your side (team, streak, calc) on the right ---------- */
+        .main, .side { display: contents; }
+        @media (min-width: 1100px) {
+            body:not(.display) { overflow: hidden; }
+            body:not(.display) #stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(560px, 42%); grid-template-rows: auto auto minmax(0, 1fr); height: 100vh; }
+            body:not(.display) .bar, body:not(.display) .theme-panel { grid-column: 1 / -1; }
+            body:not(.display) .main, body:not(.display) .side { display: block; overflow-y: auto; min-height: 0; grid-row: 3; padding-top: 8px; }
+            body:not(.display) .side { border-left: 1px solid var(--line); }
+            body:not(.display) .side .team, body:not(.display) .side .streak { max-width: calc(100% - 16px); }
+        }
         /* OBS fill mode (opponent source): the panel fills its box exactly */
         body.display.fill #stage { display: flex; flex-direction: column; overflow: hidden; }
         body.display.fill .head { flex: none; }
@@ -429,6 +467,7 @@
         <div class="hint">Opacity only affects the OBS view: lower it to let your stream background show through.</div>
     </div>
 
+    <div class="main" id="main">
     <div class="head" id="head"></div>
 
     <div class="picker" id="picker">
@@ -440,12 +479,15 @@
     </div>
 
     <div class="slots" id="slots"><div class="status">Loading data…</div></div>
+    <div class="note" id="note"></div>
+    <div class="foot" id="foot"></div>
+    </div>
+    <div class="side" id="side">
     <div class="team" id="team"></div>
     <div class="streak" id="streak"></div>
     <div class="calc" id="calc"></div>
+    </div>
     <div id="dialog"></div>
-    <div class="note" id="note"></div>
-    <div class="foot" id="foot"></div>
 </div>
 
 <script src="battlelog.js"></script>
@@ -561,7 +603,8 @@ const DEFAULT_STATE = {
     auto: { on: false, dir: '', streak: true },   // auto mode: follow the game's chat log
     showCalc: true,
     // damage calc: which of your Pokémon / which opponent pick, their set, stat boosts, HP %, field, selected move
-    calc: { mine: 0, foe: 0, foeSet: null, boosts: { mine: {}, foe: {} }, hp: { mine: 100, foe: 100 }, weather: '', crit: false, sel: null },
+    calc: { mine: 0, foe: 0, foeSets: {}, boosts: { mine: {}, foe: {} }, hp: { mine: 100, foe: 100 }, weather: '', gravity: false,
+            sides: { mine: {}, foe: {} }, edits: {}, sel: null },
     theme: { ...DEFAULT_THEME },
 };
 let state = loadState();
@@ -755,6 +798,7 @@ function renderSet(c, pick, idx) {
     const s = c.set;
     const cls = ['set'];
     if (c.possible) cls.push('possible');
+    if (!DISPLAY && state.showCalc && calcMark && calcMark.slot === idx && calcMark.setId === s.set_id) cls.push('in-calc');
     if (pick.locked === s.set_id) cls.push('locked');
     else if (pick.locked != null) cls.push('out');
     else { const fit = setFit(s, pick.revealed, pick.item); if (fit) cls.push(fit); }
@@ -857,7 +901,12 @@ function renderPicker() {
         }).join('') || `<div class="empty">No match.</div>`;
 }
 
+let calcMark = null;   // which set tile the calc is using (outlined in the app)
 function renderSlots() {
+    if (!DISPLAY && state.showCalc && window.Calc) {
+        const cs = calcSides();
+        calcMark = cs.foeSet ? { slot: state.picks.indexOf(cs.pick), setId: cs.foeSet.set_id } : null;
+    }
     const box = document.getElementById('slots');
     const n = slotCount();
     let html = state.picks.slice(0, n).map(renderSlot).join('');
@@ -969,6 +1018,11 @@ function wireControls() {
     });
 
     document.getElementById('slots').addEventListener('click', e => {
+        if (e.ctrlKey || e.metaKey) {
+            const tile = e.target.closest('.set[data-set]');
+            if (tile) { e.preventDefault(); calcPickFoe(+tile.dataset.slot, +tile.dataset.set); }
+            return;
+        }
         const rm = e.target.closest('[data-remove]');
         if (rm) { state.picks.splice(+rm.dataset.remove, 1); commit(); return; }
         const mv = e.target.closest('.move[data-move]');
@@ -1053,7 +1107,12 @@ function wireTrainerSearch() {
 const FIXED_SCALE = parseFloat(params.get('scale')) || null;
 function applyZoom() {
     const stage = document.getElementById('stage');
-    if (!DISPLAY) { stage.style.zoom = state.zoom; return; }
+    if (!DISPLAY) {
+        stage.style.zoom = state.zoom;
+        // Two-column layout fills the window height; the columns scroll on their own
+        stage.style.height = window.innerWidth >= 1100 ? (window.innerHeight / state.zoom) + 'px' : '';
+        return;
+    }
     if (FIXED_SCALE) { stage.style.zoom = FIXED_SCALE; return; }
     const fit = () => {
         stage.style.zoom = 1;
@@ -1120,6 +1179,7 @@ if (DISPLAY) {
     let refit = null;
     document.addEventListener('load', () => { clearTimeout(refit); refit = setTimeout(applyZoom, 100); }, true);
 }
+else window.addEventListener('resize', () => applyZoom());
 
 // ============================================================
 // Your team: Tower teams are saved Showdown-format text; Factory rentals are sheet sets
@@ -1192,7 +1252,8 @@ function memberCard(m, i) {
         return `<span class="move t-${info ? info[0] : 'Unknown'}" title="${esc(mv)}">${esc(mv)}</span>`;
     }).join('');
     const click = !DISPLAY && state.facility === 'factory' ? ` click" data-rental="${i}" title="Click to swap this rental` : '';
-    return `<div class="set tm${click}">
+    const inCalc = !DISPLAY && state.showCalc && i === Math.min(state.calc.mine, Math.max(0, resolveTeam().length - 1)) ? ' in-calc' : '';
+    return `<div class="set tm${click}${inCalc}" data-member="${i}">
         <div class="set-top">
             <span class="tm-sprite">${id ? `<img class="mon-img" src="${SPRITE(id)}" alt="" onerror="this.remove()">` : ''}</span>
             ${itemIcon(m.item)}
@@ -1490,6 +1551,11 @@ function openRentalPicker(slot) {
 
 function wireTeam() {
     document.getElementById('team').addEventListener('click', e => {
+        if (e.ctrlKey || e.metaKey) {
+            const tile = e.target.closest('[data-member]');
+            if (tile) calcPickMine(+tile.dataset.member);
+            return;
+        }
         if (e.target.closest('#editTeams')) return openTeamEditor(state.towerTeamId);
         const r = e.target.closest('[data-rental]');
         if (r) openRentalPicker(+r.dataset.rental);
@@ -1798,10 +1864,16 @@ function openAutoDialog() {
 // ============================================================
 // Damage calc: your Pokémon vs the opponent's, with the PokeMMO calc engine (calc.js, from nthGP/pokemmo-damage-calc).
 // The app works it out; OBS (&part=calc) only draws the result it's sent.
+// Anything changed in the calc (nature, EVs, item, moves...) is kept per Pokémon in state.calc.edits and never
+// touches the team or the set data.
 // ============================================================
 const CALC_ITEM_FIX = { 'leek': 'Stick', 'notlum': null, 'assaultgear': 'Assault Vest', 'covertmantle': 'Covert Cloak' };
 const CALC_MOVE_FIX = { 'faintattack': 'Feint Attack' };
-const STAT_NAMES = [['atk', 'Atk'], ['def', 'Def'], ['spa', 'SpA'], ['spd', 'SpD'], ['spe', 'Spe']];
+const STATS6 = [['hp', 'HP'], ['atk', 'Atk'], ['def', 'Def'], ['spa', 'SpA'], ['spd', 'SpD'], ['spe', 'Spe']];
+const STATUSES = [['', 'Healthy'], ['brn', 'Burned'], ['par', 'Paralyzed'], ['psn', 'Poisoned'], ['tox', 'Badly poisoned'], ['slp', 'Asleep'], ['frz', 'Frozen']];
+const SIDE_FLAGS = [['isReflect', 'Reflect'], ['isLightScreen', 'Light Screen'], ['isSR', 'Stealth Rock'],
+                    ['isHelpingHand', 'Helping Hand', true], ['isFriendGuard', 'Friend Guard', true], ['isTailwind', 'Tailwind'], ['isProtected', 'Protect']];
+const cid = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 let calcGenCache = null;
 const calcGen = () => calcGenCache || (window.Calc ? (calcGenCache = window.Calc.Generations.get(5)) : null);
 const calcSpecies = sp => String(sp).replace(/♀/g, '-F').replace(/♂/g, '-M');
@@ -1815,94 +1887,148 @@ function calcSides() {
     let foeSet = null, options = [];
     if (pick) {
         options = candidates(pick.species).filter(x => x.set).map(x => x.set);
-        const chosen = pick.locked != null ? pick.locked : (c.foeSets || {})[pick.species];
+        const chosen = (c.foeSets || {})[pick.species] != null ? c.foeSets[pick.species] : pick.locked;
         foeSet = options.find(x => x.set_id === chosen)
+              || (pick.locked != null && options.find(x => x.set_id === pick.locked))
               || options.find(x => !setFit(x, pick.revealed, pick.item)) || options[0] || null;
     }
     return { team, mine, pick, foeSet, options };
 }
 
-// A calc Pokémon from a team member or a set. Unknown names are left out and reported, never guessed.
-function calcPokemon(src, boosts, hpPct, notes, who, foe) {
-    const C = window.Calc, gen = calcGen();
-    const id = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const editKey = (side, src) => side === 'mine' ? `m:${src.nickname || ''}:${src.species}` : `f:${src.pokemon}-${src.set_id}`;
+
+// The set as the calc uses it: the original, with what you changed in the calc on top
+function calcSource(side, src) {
+    const e = (state.calc.edits || {})[editKey(side, src)] || {};
     const iv = src.ivs;
     const ivs = typeof iv === 'number' ? { hp: iv, atk: iv, def: iv, spa: iv, spd: iv, spe: iv }
               : { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...(iv || {}) };
-    const opts = { level: state.level, nature: src.nature || 'Hardy', evs: src.evs || {}, ivs, boosts: boosts || {} };
-    if (foe && !src.nature) notes.push(`${who}: nature unscouted (neutral used)`);
-    if (src.item) {
-        const fixed = id(src.item) in CALC_ITEM_FIX ? CALC_ITEM_FIX[id(src.item)] : src.item;
-        if (fixed && gen.items.get(id(fixed))) opts.item = fixed;
-        else if (fixed) notes.push(`${who}: item "${src.item}" not in the calc`);
-    } else if (foe) notes.push(`${who}: item unscouted`);
-    if (src.ability) {
-        if (gen.abilities.get(id(src.ability))) opts.ability = src.ability;
-        else notes.push(`${who}: ability "${src.ability}" not in the calc`);
-    } else if (foe) notes.push(`${who}: ability unscouted`);
-    let mon = new C.Pokemon(gen, calcSpecies(src.species || src.pokemon), opts);
-    const pct = Math.max(1, Math.min(100, +hpPct || 100));
-    if (pct < 100) mon = new C.Pokemon(gen, calcSpecies(src.species || src.pokemon), { ...opts, curHP: Math.max(1, Math.floor(mon.maxHP() * pct / 100)) });
+    const moves = [0, 1, 2, 3].map(i => e.moves && e.moves[i] != null ? e.moves[i] : ((src.moves || [])[i] || ''));
+    return {
+        species: src.species || src.pokemon,
+        nature: e.nature !== undefined ? e.nature : src.nature,
+        item: e.item !== undefined ? e.item : src.item,
+        ability: e.ability !== undefined ? e.ability : src.ability,
+        status: e.status || '',
+        evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...(src.evs || {}), ...(e.evs || {}) },
+        ivs: { ...ivs, ...(e.ivs || {}) },
+        moves, hits: e.hits || [], crits: e.crits || [],
+        edited: Object.keys(e).length > 0,
+        orig: src,
+    };
+}
+
+// A calc Pokémon. Names the calc doesn't know are left out and reported, never guessed.
+function calcPokemon(s, side, notes, label, foe) {
+    const C = window.Calc, gen = calcGen();
+    const c = state.calc;
+    const opts = { level: state.level, nature: s.nature || 'Hardy', evs: s.evs, ivs: s.ivs, boosts: (c.boosts || {})[side] || {} };
+    if (s.status) opts.status = s.status;
+    if (foe && !s.nature) notes.push(`${label}: nature unscouted (neutral used)`);
+    if (s.item) {
+        const fixed = cid(s.item) in CALC_ITEM_FIX ? CALC_ITEM_FIX[cid(s.item)] : s.item;
+        if (fixed && gen.items.get(cid(fixed))) opts.item = fixed;
+        else if (fixed) notes.push(`${label}: item "${s.item}" isn't in the calc`);
+    } else if (foe) notes.push(`${label}: item unscouted`);
+    if (s.ability) {
+        if (gen.abilities.get(cid(s.ability))) opts.ability = s.ability;
+        else notes.push(`${label}: ability "${s.ability}" isn't in the calc`);
+    } else if (foe) notes.push(`${label}: ability unscouted`);
+    let mon = new C.Pokemon(gen, calcSpecies(s.species), opts);
+    const pct = Math.max(1, Math.min(100, +((c.hp || {})[side]) || 100));
+    if (pct < 100) mon = new C.Pokemon(gen, calcSpecies(s.species), { ...opts, curHP: Math.max(1, Math.floor(mon.maxHP() * pct / 100)) });
     return mon;
 }
 
-// Every move of `att` against `def`
-function calcMoves(att, def, moveNames, field) {
+function calcField(attackerSide) {
+    const c = state.calc, sides = c.sides || {};
+    const other = attackerSide === 'mine' ? 'foe' : 'mine';
+    return new window.Calc.Field({
+        gameType: state.format === 'doubles' ? 'Doubles' : 'Singles',
+        weather: c.weather || undefined,
+        isGravity: !!c.gravity,
+        attackerSide: { ...(sides[attackerSide] || {}) },
+        defenderSide: { ...(sides[other] || {}) },
+    });
+}
+
+// Every move of one side against the other
+function calcMoves(s, att, def, side) {
     const C = window.Calc, gen = calcGen();
-    const out = [];
-    for (let i = 0; i < 4; i++) {
-        const raw = (moveNames[i] || '').trim();
-        if (!raw) { out.push({ name: '?', unk: true }); continue; }
-        const key = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const name = CALC_MOVE_FIX[key] || raw;
+    const field = calcField(side);
+    return s.moves.map((raw, i) => {
+        raw = String(raw || '').trim();
+        if (!raw) return { name: '?', unk: true };
+        const name = CALC_MOVE_FIX[cid(raw)] || raw;
+        if (!gen.moves.get(cid(name))) return { name: raw, unk: true, err: true };
         try {
-            const move = new C.Move(gen, name, { isCrit: !!state.calc.crit });
-            const type = move.type;
-            if (move.category === 'Status') { out.push({ name: raw, type, status: true }); continue; }
+            const data = gen.moves.get(cid(name));
+            const multi = Array.isArray(data.multihit) ? data.multihit : null;
+            const opt = { isCrit: !!s.crits[i], ability: att.ability, item: att.item, species: att.name };
+            if (multi && s.hits[i]) opt.hits = s.hits[i];
+            const move = new C.Move(gen, name, opt);
+            const base = { name: raw, type: move.type, multi, hits: move.hits, crit: !!s.crits[i] };
+            if (move.category === 'Status') return { ...base, status: true };
             const res = C.calculate(gen, att, def, move, field);
             const [lo, hi] = res.range();
             const hp = res.defender.maxHP();
-            let desc = '', rolls = [];
-            try { desc = res.fullDesc(); } catch (e) { desc = ''; }
-            if (Array.isArray(res.damage) && res.damage.every(x => typeof x === 'number')) rolls = res.damage;
-            out.push({ name: raw, type, lo: lo / hp * 100, hi: hi / hp * 100, ko: lo >= def.curHP(), desc, rolls });
+            let desc = '';
+            try { desc = res.fullDesc(); } catch (e) {}
+            const rolls = Array.isArray(res.damage) && res.damage.every(x => typeof x === 'number') ? res.damage : [];
+            return { ...base, lo: lo / hp * 100, hi: hi / hp * 100, ko: lo >= def.curHP(), desc, rolls };
         } catch (e) {
-            out.push({ name: raw, unk: true, err: true });
+            return { name: raw, unk: true, err: true };
         }
-    }
-    return out;
+    });
 }
 
-// What the panel shows (also what OBS gets)
-function calcView() {
-    if (DISPLAY) return state.calcView || null;
-    if (!calcGen()) return null;
-    const { mine, pick, foeSet } = calcSides();
-    if (!mine || !pick || !foeSet) return { empty: !mine ? 'Add your team to use the calc.' : 'Pick the opponent\'s Pokémon to use the calc.' };
+function finalSpeed(mon, side) {
+    try { return window.Calc.getFinalSpeed(calcGen(), mon, calcField(side), calcField(side).attackerSide); }
+    catch (e) { return mon.stats.spe; }
+}
+
+// Works out both sides. Returns what the panel needs, and the calc Pokémon for the editors.
+function calcRun() {
+    if (!calcGen()) return { view: null };
+    const sides = calcSides();
+    const { mine, pick, foeSet } = sides;
+    if (!mine || !pick || !foeSet) {
+        return { sides, view: { empty: !mine ? 'Add your team to use the calc.' : "Pick the opponent's Pokémon (or Ctrl+click one of its sets)." } };
+    }
     const c = state.calc, notes = [];
     try {
-        const A = calcPokemon(mine, c.boosts.mine, c.hp.mine, notes, mine.species);
-        const B = calcPokemon(foeSet, c.boosts.foe, c.hp.foe, notes, `${foeSet.pokemon}-${foeSet.set_id}`, true);
-        const field = new window.Calc.Field({ gameType: state.format === 'doubles' ? 'Doubles' : 'Singles', weather: c.weather || undefined });
-        const mineMoves = calcMoves(A, B, mine.moves || [], field);
-        const foeMoves = calcMoves(B, A, foeSet.moves || [], field);
-        if (foeSet.moves.some(m => !m || !m.trim())) notes.push(`${foeSet.pokemon}-${foeSet.set_id}: unscouted move slot(s)`);
-        // Selected move: the one clicked, else your hardest-hitting one
-        let sel = c.sel && (c.sel.side === 'mine' ? mineMoves : foeMoves)[c.sel.i] && !(c.sel.side === 'mine' ? mineMoves : foeMoves)[c.sel.i].unk ? c.sel : null;
+        const sm = calcSource('mine', mine), sf = calcSource('foe', foeSet);
+        const A = calcPokemon(sm, 'mine', notes, mine.species, false);
+        const B = calcPokemon(sf, 'foe', notes, `${foeSet.pokemon}-${foeSet.set_id}`, true);
+        if (sf.moves.some(m => !m.trim())) notes.push(`${foeSet.pokemon}-${foeSet.set_id}: unscouted move slot(s)`);
+        const mineMoves = calcMoves(sm, A, B, 'mine');
+        const foeMoves = calcMoves(sf, B, A, 'foe');
+        const list = side => side === 'mine' ? mineMoves : foeMoves;
+        let sel = c.sel && list(c.sel.side)[c.sel.i] && !list(c.sel.side)[c.sel.i].unk ? c.sel : null;
         if (!sel) {
             let best = -1;
             mineMoves.forEach((m, i) => { if (m.hi != null && m.hi > best) { best = m.hi; sel = { side: 'mine', i }; } });
         }
-        const s = sel && (sel.side === 'mine' ? mineMoves : foeMoves)[sel.i];
+        const s = sel && list(sel.side)[sel.i];
+        const speA = finalSpeed(A, 'mine'), speB = finalSpeed(B, 'foe');
         return {
-            mine: { name: mine.species, moves: mineMoves },
-            foe: { name: foeSet.pokemon, moves: foeMoves },
-            sel, desc: s && s.desc || '', rolls: s && s.rolls || [], notes: [...new Set(notes)],
+            sides, sm, sf, A, B, speA, speB,
+            view: {
+                mine: { name: mine.species, moves: mineMoves, spe: speA },
+                foe: { name: foeSet.pokemon, moves: foeMoves, spe: speB },
+                sel, desc: s && s.desc || '', rolls: s && s.rolls || [], notes: [...new Set(notes)],
+            },
         };
     } catch (e) {
-        console.error(e.stack);
-        return { empty: "Couldn't calc this matchup: " + e.message };
+        console.error(e);
+        return { sides, view: { empty: "Couldn't calc this matchup: " + e.message } };
     }
+}
+
+// What OBS gets
+function calcView() {
+    if (DISPLAY) return state.calcView || null;
+    return calcRun().view;
 }
 
 const fmtPct = v => (Math.round(v * 10) / 10).toFixed(1);
@@ -1910,37 +2036,85 @@ const fmtPct = v => (Math.round(v * 10) / 10).toFixed(1);
 function calcColumn(side, data, sel) {
     const rows = data.moves.map((m, i) => {
         const cls = ['cc-move', m.unk ? 'unk' : 't-' + (m.type || 'Unknown'), sel && sel.side === side && sel.i === i ? 'sel' : ''].join(' ');
+        const tag = [m.multi ? `×${m.hits}` : '', m.crit ? 'crit' : ''].filter(Boolean).join(' ');
         const pct = m.unk ? '<span class="cc-pct dim">?</span>'
                   : m.status ? '<span class="cc-pct dim">—</span>'
-                  : `<span class="cc-pct${m.ko ? ' ko' : ''}">${fmtPct(m.lo)} – ${fmtPct(m.hi)}%</span>`;
+                  : `<span class="cc-pct${m.ko ? ' ko' : ''}">${fmtPct(m.lo)} – ${fmtPct(m.hi)}%${tag ? ` <small>${tag}</small>` : ''}</span>`;
         return `<span class="${cls}" data-cside="${side}" data-ci="${i}">${esc(m.name)}</span>${pct}`;
     }).join('');
-    return `<div class="cc-col"><h4>${esc(data.name)}'s moves</h4><div class="cc-list">${rows}</div></div>`;
+    const faster = data.spe != null ? `<span class="cc-spe">${data.spe} Spe</span>` : '';
+    return `<div class="cc-col"><h4>${esc(data.name)}'s moves ${faster}</h4><div class="cc-list">${rows}</div></div>`;
 }
 
-function calcControls(sides, view) {
-    const c = state.calc;
-    const boostSel = (side, k, label) => {
-        const v = (c.boosts[side] || {})[k] || 0;
-        const opts = [];
-        for (let b = 6; b >= -6; b--) opts.push(`<option value="${b}"${b === v ? ' selected' : ''}>${b > 0 ? '+' + b : b}</option>`);
-        return `<span class="cc-boost">${label}<select data-boost="${side}.${k}" class="${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${opts.join('')}</select></span>`;
-    };
-    const boosts = side => STAT_NAMES.map(([k, l]) => boostSel(side, k, l)).join('');
-    const mineOpts = sides.team.map((m, i) => `<option value="${i}"${m === sides.mine ? ' selected' : ''}>${esc(m.nickname ? `${m.nickname} (${m.species})` : m.species)}</option>`).join('');
-    const foeOpts = state.picks.map((p, i) => `<option value="${i}"${p === sides.pick ? ' selected' : ''}>${esc(p.species)}</option>`).join('');
-    const setOpts = sides.options.map(x => `<option value="${x.set_id}"${x === sides.foeSet ? ' selected' : ''}>Set ${x.set_id}${x.item ? ' · ' + esc(x.item) : ''}${x.nature ? ' · ' + esc(x.nature) : ''}</option>`).join('');
-    const weathers = ['', 'Sun', 'Rain', 'Sand', 'Hail'].map(w => `<option value="${w}"${w === (c.weather || '') ? ' selected' : ''}>${w || 'No weather'}</option>`).join('');
-    return `<div class="cc-controls">
-        <div class="cc-row"><b>Yours</b>${sides.team.length ? `<select data-cfield="mine">${mineOpts}</select>` : '<span>No team</span>'}
-            HP <input type="text" data-hp="mine" value="${c.hp.mine}">% ${boosts('mine')}</div>
-        <div class="cc-row"><b>Theirs</b>${state.picks.length ? `<select data-cfield="foe">${foeOpts}</select>` : '<span>No Pokémon picked</span>'}
-            ${sides.options.length > 1 ? `<select data-cfield="foeSet">${setOpts}</select>` : ''}
-            HP <input type="text" data-hp="foe" value="${c.hp.foe}">% ${boosts('foe')}</div>
-        <div class="cc-row"><b>Field</b><select data-cfield="weather">${weathers}</select>
-            <label><input type="checkbox" data-cfield="crit"${c.crit ? ' checked' : ''}> Critical hit</label>
-            <span class="grow"></span><button class="icon-btn" id="ccReset" title="Reset boosts and HP">Reset</button></div>
-        ${view && view.notes && view.notes.length ? `<div class="cc-notes">${view.notes.map(esc).join(' · ')}</div>` : ''}
+function calcResults(view) {
+    if (!view) return `<div class="cc-empty">The calc isn't available.</div>`;
+    if (view.empty) return DISPLAY ? '' : `<div class="cc-empty">${esc(view.empty)}</div>`;
+    return `<div class="cc-cols">${calcColumn('mine', view.mine, view.sel)}${calcColumn('foe', view.foe, view.sel)}</div>
+        ${view.desc ? `<div><div class="cc-head">${esc(view.desc)}</div>
+        ${view.rolls.length ? `<div class="cc-rolls">Possible damage amounts: (${view.rolls.join(', ')})</div>` : ''}</div>` : ''}`;
+}
+
+// ---- the editors (app only) ----
+let calcLists = null;
+function calcDatalists() {
+    if (calcLists) return calcLists;
+    const gen = calcGen();
+    const names = it => [...it].map(x => x.name).filter(n => !/^(G-Max|Max |Z-)/.test(n)).sort();
+    const opt = arr => arr.map(n => `<option value="${esc(n)}">`).join('');
+    calcLists = `<datalist id="ccMoves">${opt(names(gen.moves))}</datalist>
+        <datalist id="ccItems">${opt(names(gen.items))}</datalist>
+        <datalist id="ccAbilities">${opt(names(gen.abilities))}</datalist>`;
+    return calcLists;
+}
+
+function calcEditor(side, s, mon, spe, header) {
+    const c = state.calc, gen = calcGen();
+    const boosts = (c.boosts || {})[side] || {};
+    const natures = [...gen.natures].map(n => n.name).sort();
+    const natureOpts = [`<option value=""${!s.nature ? ' selected' : ''}>${side === 'foe' ? 'Nature ?' : 'Hardy'}</option>`]
+        .concat(natures.map(n => {
+            const d = gen.natures.get(cid(n));
+            const tag = d.plus !== d.minus ? ` (+${d.plus[0].toUpperCase() + d.plus.slice(1)} −${d.minus[0].toUpperCase() + d.minus.slice(1)})` : '';
+            return `<option value="${n}"${n === s.nature ? ' selected' : ''}>${n}${tag}</option>`;
+        })).join('');
+    const base = mon.species.baseStats;
+    const boostOpts = v => { let o = ''; for (let b = 6; b >= -6; b--) o += `<option value="${b}"${b === v ? ' selected' : ''}>${b > 0 ? '+' + b : b}</option>`; return o; };
+    const rows = STATS6.map(([k, l]) => {
+        const b = boosts[k] || 0;
+        const val = k === 'spe' && spe !== mon.stats.spe ? `${mon.stats.spe} → <b>${spe}</b>` : `<b>${k === 'hp' ? mon.maxHP() : mon.stats[k]}</b>`;
+        return `<tr><th>${l}</th><td class="dim">${base[k]}</td>
+            <td><input type="text" inputmode="numeric" data-iv="${side}.${k}" value="${s.ivs[k]}"></td>
+            <td><input type="text" inputmode="numeric" data-ev="${side}.${k}" value="${s.evs[k] || 0}"></td>
+            <td>${k === 'hp' ? '' : `<select data-boost="${side}.${k}" class="${b > 0 ? 'up' : b < 0 ? 'down' : ''}">${boostOpts(b)}</select>`}</td>
+            <td class="val">${val}</td></tr>`;
+    }).join('');
+    const evTotal = STATS6.reduce((t, [k]) => t + (+s.evs[k] || 0), 0);
+    const moves = s.moves.map((m, i) => {
+        const data = m && gen.moves.get(cid(CALC_MOVE_FIX[cid(m)] || m));
+        const multi = data && Array.isArray(data.multihit) ? data.multihit : null;
+        const hits = multi ? `<select data-hits="${side}.${i}" title="Hits">${Array.from({ length: multi[1] - multi[0] + 1 }, (_, k) => multi[0] + k)
+            .map(h => `<option value="${h}"${h === (s.hits[i] || (cid(s.ability) === 'skilllink' || multi[0] !== 2 ? multi[1] : 3)) ? ' selected' : ''}>${h} hits</option>`).join('')}</select>` : '';
+        return `<div class="cc-mv"><input type="text" list="ccMoves" data-move="${side}.${i}" value="${esc(m)}" placeholder="${side === 'foe' ? 'Unscouted' : 'Move'}" spellcheck="false">
+            ${hits}<label title="Critical hit"><input type="checkbox" data-crit="${side}.${i}"${s.crits[i] ? ' checked' : ''}>Crit</label></div>`;
+    }).join('');
+    const sideFlags = SIDE_FLAGS.filter(([, , dbl]) => !dbl || state.format === 'doubles').map(([k, l]) =>
+        `<label><input type="checkbox" data-sflag="${side}.${k}"${((c.sides || {})[side] || {})[k] ? ' checked' : ''}>${l}</label>`).join('');
+    const spikes = ((c.sides || {})[side] || {}).spikes || 0;
+    return `<div class="cc-ed">
+        <div class="cc-ed-head">${header}</div>
+        <div class="cc-grid">
+            <label>Nature<select data-nature="${side}">${natureOpts}</select></label>
+            <label>Item<input type="text" list="ccItems" data-item="${side}" value="${esc(s.item || '')}" placeholder="${side === 'foe' ? 'Unscouted' : 'None'}" spellcheck="false"></label>
+            <label>Ability<input type="text" list="ccAbilities" data-ability="${side}" value="${esc(s.ability || '')}" placeholder="${side === 'foe' ? 'Unscouted' : ''}" spellcheck="false"></label>
+            <label>Status<select data-status="${side}">${STATUSES.map(([v, l]) => `<option value="${v}"${v === s.status ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+            <label>HP %<input type="text" inputmode="numeric" data-hp="${side}" value="${(c.hp || {})[side] || 100}"></label>
+        </div>
+        <table class="cc-stats"><tr><th></th><th>Base</th><th>IV</th><th>EV</th><th>Boost</th><th>Stat</th></tr>${rows}
+            <tr><td colspan="6" class="cc-evsum${evTotal > 510 ? ' over' : ''}">EVs ${evTotal}/510</td></tr></table>
+        <div class="cc-moves">${moves}</div>
+        <div class="cc-flags">${sideFlags}<label>Spikes<select data-spikes="${side}">${[0, 1, 2, 3].map(n => `<option${n === spikes ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div>
+        <div class="cc-ed-foot">${s.edited ? '<span class="cc-edited">Changed in the calc</span>' : ''}<span class="grow"></span>
+            <button class="icon-btn" data-reset="${side}" title="Back to the set as scouted, no boosts, full HP">Reset</button></div>
     </div>`;
 }
 
@@ -1949,48 +2123,116 @@ function renderCalc() {
     const show = DISPLAY ? PART === 'calc' : state.showCalc;
     box.classList.toggle('hidden', !show);
     if (!show) return;
-    const view = calcView();
-    const sides = DISPLAY ? null : calcSides();
-    let body;
-    if (!view) body = `<div class="cc-empty">The calc isn't available.</div>`;
-    else if (view.empty) body = DISPLAY ? '' : `<div class="cc-empty">${esc(view.empty)}</div>`;
-    else body = `<div class="cc-cols">${calcColumn('mine', view.mine, view.sel)}${calcColumn('foe', view.foe, view.sel)}</div>
-        ${view.desc ? `<div><div class="cc-head">${esc(view.desc)}</div>
-        ${view.rolls.length ? `<div class="cc-rolls">Possible damage amounts: (${view.rolls.join(', ')})</div>` : ''}</div>` : ''}`;
-    box.innerHTML = (DISPLAY ? '' : calcControls(sides, view)) + body;
-    // In its own OBS source the panel takes the box's shape, like the streak panel
-    if (DISPLAY && PART === 'calc') {
-        const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
-        box.style.width = '';
-        for (let i = 0; i < 2; i++) box.style.width = Math.max(560, Math.round(box.offsetHeight * aspect)) + 'px';
+    if (DISPLAY) {
+        box.innerHTML = calcResults(calcView());
+        if (PART === 'calc') {
+            // In its own OBS source the panel takes the box's shape, like the streak panel
+            const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+            box.style.width = '';
+            for (let i = 0; i < 2; i++) box.style.width = Math.max(560, Math.round(box.offsetHeight * aspect)) + 'px';
+        }
+        return;
+    }
+    // Keep the caret where it was if a re-render happens while typing
+    const focus = document.activeElement && box.contains(document.activeElement) ? document.activeElement : null;
+    const fsel = focus ? [...box.querySelectorAll('input,select')].indexOf(focus) : -1;
+    const run = calcRun();
+    const c = state.calc, sides = run.sides || calcSides();
+    const mineOpts = sides.team.map((m, i) => `<option value="${i}"${m === sides.mine ? ' selected' : ''}>${esc(m.nickname ? `${m.nickname} (${m.species})` : m.species)}</option>`).join('');
+    const foeOpts = state.picks.map((p, i) => `<option value="${i}"${p === sides.pick ? ' selected' : ''}>${esc(p.species)}</option>`).join('');
+    const setOpts = sides.options.map(x => `<option value="${x.set_id}"${x === sides.foeSet ? ' selected' : ''}>Set ${x.set_id}${x.item ? ' · ' + esc(x.item) : ''}</option>`).join('');
+    const headMine = `<b>Yours</b>${sides.team.length ? `<select data-cfield="mine">${mineOpts}</select>` : '<span class="dim">No team yet</span>'}`;
+    const headFoe = `<b>Theirs</b>${state.picks.length ? `<select data-cfield="foe">${foeOpts}</select>` : '<span class="dim">No Pokémon picked</span>'}
+        ${sides.options.length > 1 ? `<select data-cfield="foeSet">${setOpts}</select>` : ''}`;
+    const weathers = ['', 'Sun', 'Rain', 'Sand', 'Hail'].map(w => `<option value="${w}"${w === (c.weather || '') ? ' selected' : ''}>${w || 'No weather'}</option>`).join('');
+    const editors = run.A
+        ? `<div class="cc-eds">${calcEditor('mine', run.sm, run.A, run.speA, headMine)}${calcEditor('foe', run.sf, run.B, run.speB, headFoe)}</div>`
+        : `<div class="cc-eds"><div class="cc-ed"><div class="cc-ed-head">${headMine}</div></div><div class="cc-ed"><div class="cc-ed-head">${headFoe}</div></div></div>`;
+    const v = run.view;
+    box.innerHTML = `${calcDatalists()}
+        <div class="cc-title"><span>Damage calc</span><span class="grow"></span>
+            <select data-cfield="weather">${weathers}</select>
+            <label><input type="checkbox" data-cfield="gravity"${c.gravity ? ' checked' : ''}> Gravity</label>
+            <span class="dim">${state.format === 'doubles' ? 'Doubles' : 'Singles'} · Lv ${state.level}</span></div>
+        <div class="cc-results">${calcResults(v)}</div>
+        ${v && v.notes && v.notes.length ? `<div class="cc-notes">${v.notes.map(esc).join(' · ')}</div>` : ''}
+        ${editors}
+        <div class="cc-hint">Ctrl+click a set tile or one of your team to put it in the calc. Click a move above to see its full calc.</div>`;
+    if (fsel >= 0) {
+        const el = box.querySelectorAll('input,select')[fsel];
+        if (el) { el.focus(); if (el.type === 'text') { const n = el.value.length; try { el.setSelectionRange(n, n); } catch (e) {} } }
     }
 }
 
 function wireCalc() {
     const box = document.getElementById('calc');
-    const set = patch => { state.calc = { ...state.calc, ...patch }; commit(); };
+    const c = () => state.calc;
+    // The re-render waits a tick, so a Tab out of a field has already moved focus (which is then put back)
+    const set = patch => { state.calc = { ...state.calc, ...patch }; setTimeout(() => commit(), 0); };
+    // Edits to one side's Pokémon (kept per Pokémon)
+    const edit = (side, fn) => {
+        const sides = calcSides();
+        const src = side === 'mine' ? sides.mine : sides.foeSet;
+        if (!src) return;
+        const key = editKey(side, src);
+        const edits = { ...(c().edits || {}) };
+        const e = JSON.parse(JSON.stringify(edits[key] || {}));
+        fn(e, calcSource(side, src));
+        edits[key] = e;
+        set({ edits });
+    };
+    const num = (v, lo, hi) => Math.max(lo, Math.min(hi, parseInt(String(v).replace(/[^\d]/g, ''), 10) || 0));
     box.addEventListener('click', e => {
         const mv = e.target.closest('.cc-move[data-cside]');
         if (mv && !mv.classList.contains('unk')) return set({ sel: { side: mv.dataset.cside, i: +mv.dataset.ci } });
-        if (e.target.id === 'ccReset') set({ boosts: { mine: {}, foe: {} }, hp: { mine: 100, foe: 100 } });
+        const r = e.target.closest('[data-reset]');
+        if (r) {
+            const side = r.dataset.reset, sides = calcSides();
+            const src = side === 'mine' ? sides.mine : sides.foeSet;
+            const edits = { ...(c().edits || {}) };
+            if (src) delete edits[editKey(side, src)];
+            set({ edits, boosts: { ...c().boosts, [side]: {} }, hp: { ...c().hp, [side]: 100 }, sides: { ...(c().sides || {}), [side]: {} } });
+        }
     });
     box.addEventListener('change', e => {
-        const t = e.target, c = state.calc;
-        if (t.dataset.boost) {
-            const [side, k] = t.dataset.boost.split('.');
-            return set({ boosts: { ...c.boosts, [side]: { ...c.boosts[side], [k]: +t.value } } });
-        }
-        if (t.dataset.hp) {
-            const v = Math.max(1, Math.min(100, parseInt(t.value, 10) || 100));
-            return set({ hp: { ...c.hp, [t.dataset.hp]: v } });
-        }
-        const f = t.dataset.cfield;
-        if (f === 'mine') return set({ mine: +t.value, boosts: { ...c.boosts, mine: {} }, hp: { ...c.hp, mine: 100 }, sel: null });
-        if (f === 'foe') return set({ foe: +t.value, boosts: { ...c.boosts, foe: {} }, hp: { ...c.hp, foe: 100 }, sel: null });
-        if (f === 'foeSet') { const pick = state.picks[c.foe] || state.picks[0]; return set({ foeSets: { ...(c.foeSets || {}), [pick.species]: +t.value } }); }
+        const t = e.target, d = t.dataset;
+        if (d.boost) { const [side, k] = d.boost.split('.'); return set({ boosts: { ...c().boosts, [side]: { ...c().boosts[side], [k]: +t.value } } }); }
+        if (d.hp) return set({ hp: { ...c().hp, [d.hp]: num(t.value, 1, 100) || 100 } });
+        if (d.ev) { const [side, k] = d.ev.split('.'); return edit(side, x => { x.evs = { ...(x.evs || {}), [k]: num(t.value, 0, 255) }; }); }
+        if (d.iv) { const [side, k] = d.iv.split('.'); return edit(side, x => { x.ivs = { ...(x.ivs || {}), [k]: num(t.value, 0, 31) }; }); }
+        if (d.nature) return edit(d.nature, x => { x.nature = t.value || null; });
+        if (d.item) return edit(d.item, x => { x.item = t.value.trim() || null; });
+        if (d.ability) return edit(d.ability, x => { x.ability = t.value.trim() || null; });
+        if (d.status) return edit(d.status, x => { x.status = t.value; });
+        if (d.move) { const [side, i] = d.move.split('.'); return edit(side, (x, s) => { x.moves = [...s.moves]; x.moves[+i] = t.value.trim(); }); }
+        if (d.hits) { const [side, i] = d.hits.split('.'); return edit(side, (x, s) => { x.hits = [...s.hits]; x.hits[+i] = +t.value; }); }
+        if (d.crit) { const [side, i] = d.crit.split('.'); return edit(side, (x, s) => { x.crits = [...s.crits]; x.crits[+i] = t.checked; }); }
+        if (d.sflag) { const [side, k] = d.sflag.split('.'); const sd = c().sides || {}; return set({ sides: { ...sd, [side]: { ...(sd[side] || {}), [k]: t.checked } } }); }
+        if (d.spikes) { const sd = c().sides || {}; return set({ sides: { ...sd, [d.spikes]: { ...(sd[d.spikes] || {}), spikes: +t.value } } }); }
+        const f = d.cfield;
+        if (f === 'mine') return set({ mine: +t.value, boosts: { ...c().boosts, mine: {} }, hp: { ...c().hp, mine: 100 }, sel: null });
+        if (f === 'foe') return set({ foe: +t.value, boosts: { ...c().boosts, foe: {} }, hp: { ...c().hp, foe: 100 }, sel: null });
+        if (f === 'foeSet') { const pick = state.picks[c().foe] || state.picks[0]; return set({ foeSets: { ...(c().foeSets || {}), [pick.species]: +t.value }, sel: null }); }
         if (f === 'weather') return set({ weather: t.value });
-        if (f === 'crit') return set({ crit: t.checked });
+        if (f === 'gravity') return set({ gravity: t.checked });
     });
+}
+
+// Ctrl+click: put an opponent's set or one of your Pokémon in the calc
+function calcPickFoe(slot, setId) {
+    const pick = state.picks[slot];
+    if (!pick) return;
+    const same = state.calc.foe === slot;
+    state.calc = { ...state.calc, foe: slot, foeSets: { ...(state.calc.foeSets || {}), [pick.species]: setId },
+                   ...(same ? {} : { boosts: { ...state.calc.boosts, foe: {} }, hp: { ...state.calc.hp, foe: 100 } }), sel: null, };
+    state.showCalc = true;
+    commit();
+}
+function calcPickMine(i) {
+    const same = state.calc.mine === i;
+    state.calc = { ...state.calc, mine: i, ...(same ? {} : { boosts: { ...state.calc.boosts, mine: {} }, hp: { ...state.calc.hp, mine: 100 } }), sel: null };
+    state.showCalc = true;
+    commit();
 }
 
 // Auto mode hooks: who's out, and stat changes from the log
@@ -2008,9 +2250,8 @@ function calcFollow(e) {
     } else if (e.type === 'boost') {
         const side = e.foe ? 'foe' : 'mine';
         const sides = calcSides();
-        const target = e.foe ? sides.pick && sides.pick.species : sides.mine && (sides.mine.nickname || sides.mine.species);
-        const alt = !e.foe && sides.mine ? sides.mine.species : null;
-        if (!target || (norm(e.name) !== norm(target) && norm(e.name) !== norm(alt))) return;
+        const names = e.foe ? [sides.pick && sides.pick.species] : [sides.mine && sides.mine.nickname, sides.mine && sides.mine.species];
+        if (!names.some(n => n && norm(n) === norm(e.name))) return;
         const b = { ...c.boosts[side] };
         for (const k of e.stats) b[k] = Math.max(-6, Math.min(6, e.set != null ? e.set : (b[k] || 0) + e.by));
         state.calc = { ...c, boosts: { ...c.boosts, [side]: b } };

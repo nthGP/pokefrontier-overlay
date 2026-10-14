@@ -70,15 +70,25 @@ When a new version is out, an **Update** button appears in the top bar.
 - Each facility, format and level keeps its own numbers. Passing your PB raises it.
 - In Factory the round follows the streak (7 wins per round).
 
-**Damage calc** (under the streak; **Calc** in the bar hides it)
-- Pick **Yours** (from your team) and **Theirs** (from the opponent's Pokémon, and which set if it could be several).
-  Both move lists show the damage range; click any move to see its full calc and every damage roll.
-- Set stat boosts (−6 to +6), HP %, weather and critical hits. Doubles uses the Doubles spread rules.
+**Damage calc** (right-hand column; **Calc** in the bar hides it)
+- **Ctrl+click** one of the opponent's set tiles to put that set in the calc, and **Ctrl+click** one of your team to
+  put it on your side. The tiles in the calc get a dashed outline. You can also pick both from the dropdowns.
+- Both move lists show the damage range and each side's speed; click any move to see its full calc and every roll.
+- Each side can be edited like any damage calc: nature, item, ability, status (burn, paralysis…), HP %, IVs, EVs,
+  boosts, the moves themselves, hits for multi-hit moves (Icicle Spear, Rock Blast…), crit per move, and that side's
+  Reflect, Light Screen, Stealth Rock, Spikes, Tailwind, Protect (and Helping Hand / Friend Guard in Doubles).
+  Weather and Gravity are at the top. The Stat column shows the real stat; speed includes Choice Scarf, paralysis,
+  Tailwind and boosts.
+- Changes stay with that Pokémon in the calc only (your team and the set data aren't touched). **Reset** puts the
+  side back to the set as scouted.
 - In auto mode it follows the battle: whoever is sent out on either side, stat changes the log reports ("…'s Attack rose!")
   and Haze. Your Pokémon are matched by nickname or species, so keep nicknames in your Showdown paste.
-- Unscouted parts of a set (nature, item, ability, moves) are listed under the controls; a blank nature is calculated as neutral.
+- Unscouted parts of a set (nature, item, ability, moves) are listed above the editors; a blank nature is calculated as neutral.
 - On stream: a Browser Source with `&part=calc` the same size as the streak's, and switch scenes between them.
 - Uses the PokeMMO damage calc engine (nthGP/pokemmo-damage-calc, based on Smogon's calc).
+
+**Window layout**: wider than 1100 px, the app splits in two: the opponent on the left, your team, streak and calc on
+the right, each scrolling on its own. Narrower, it's one column. None of this changes what OBS shows.
 
 **Theme**: click **Theme** for six presets, or pick your own accent and background colours.
 

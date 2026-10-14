@@ -28,6 +28,6 @@ function load(p) {
 """]
 for p, src in sorted(mods.items()):
     parts.append("defs[%s] = function (require, module, exports) {\n%s\n};\n" % (json.dumps(p), src))
-parts.append("window.Calc = load('index');\n})();\n")
+parts.append("window.Calc = load('index');\nwindow.Calc.getFinalSpeed = load('mechanics/util').getFinalSpeed;\n})();\n")
 open(out, 'w', encoding='utf-8').write(''.join(parts))
 print(len(mods), 'modules', os.path.getsize(out), 'bytes')
