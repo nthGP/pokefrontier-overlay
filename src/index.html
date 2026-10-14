@@ -697,7 +697,9 @@ function itemIcon(item) {
 
 // A set is "out" if it has 4 known moves and lacks a revealed one,
 // "maybe" if a revealed move could still be in one of its unscouted slots.
-function setFit(set, revealed) {
+function setFit(set, revealed, item) {
+    // A seen item rules out sets known to hold something else (and sets with no scouted item stay possible)
+    if (item && set.item && norm(set.item) !== norm(item)) return 'out';
     if (!revealed.length) return '';
     const known = set.moves.filter(m => m && m.trim()).map(norm);
     const missing = revealed.filter(m => !known.includes(norm(m)));
@@ -717,7 +719,7 @@ function renderSet(c, pick, idx) {
     if (c.possible) cls.push('possible');
     if (pick.locked === s.set_id) cls.push('locked');
     else if (pick.locked != null) cls.push('out');
-    else { const fit = setFit(s, pick.revealed); if (fit) cls.push(fit); }
+    else { const fit = setFit(s, pick.revealed, pick.item); if (fit) cls.push(fit); }
 
     const moves = [0, 1, 2, 3].map(i => {
         const m = (s.moves[i] || '').trim();
@@ -1583,14 +1585,14 @@ function applyChrome() {
 // Auto mode: the app follows PokeMMO's chat log and fills in the opponent by itself.
 // The Rust side (chatlog.rs) only passes on [Battle] lines; battlelog.js turns them into events.
 // ============================================================
-const auto = { file: null, offset: 0, inBattle: false, timer: null, status: '', error: false, battle: null, busy: false };
+const auto = { file: null, offset: 0, inBattle: false, timer: null, status: '', error: false, battle: null, busy: false, push: null };
 
 // Log name ("Gulpin", "Nidoran♀") -> the name the set data uses
 function dataSpecies(name) {
     const n = norm(name);
     const t = state.facility === 'tower' ? currentTrainer() : null;
     const pool = t ? t.pokemon_pool.map(e => e.pokemon) : [];
-    for (const sp of [...pool, ...setsBySpecies.keys(), ...Object.keys(dex.species || {})]) if (norm(sp) === n) return sp;
+    for (const sp of [...pool, ...setsBySpecies.keys()]) if (norm(sp) === n) return sp;
     return name;
 }
 
@@ -1635,6 +1637,11 @@ function applyBattleEvents(events, replay) {
             if (/^struggle$/i.test(e.move)) continue;
             const pick = state.picks.find(p => norm(p.species) === norm(e.species));
             if (pick && !pick.revealed.some(m => norm(m) === norm(e.move))) { pick.revealed.push(e.move); changed = true; }
+        } else if (e.type === 'foeItem') {
+            const pick = state.picks.find(p => norm(p.species) === norm(e.species));
+            // Only items some set actually holds (the game's names can differ, e.g. Covert Mantle)
+            const known = [...setsBySpecies.values()].flat().map(x => x.item).find(i => i && norm(i) === norm(e.item));
+            if (pick && known && pick.item !== known) { pick.item = known; changed = true; }
         } else if (e.type === 'won' || e.type === 'lost') {
             if (auto.battle) result = e.type;
             auto.battle = null;
@@ -1660,13 +1667,15 @@ async function pollAuto() {
             auto.file = chunk.file; auto.offset = chunk.offset; auto.inBattle = chunk.in_battle;
             lines = lines.concat(chunk.lines);
         } while (chunk.more);
-        let events = BattleLog.parse(lines);
+        let events;
         if (first) {
+            events = BattleLog.parse(lines);
+            auto.push = BattleLog.reader();
             // Starting up: only the latest battle matters, and nothing from it is counted on the streak
             const last = events.map(e => e.type).lastIndexOf('challenge');
             events = last >= 0 ? events.slice(last) : [];
             applyBattleEvents(events, true);
-        } else if (events.length) {
+        } else if ((events = auto.push(lines)).length) {
             const result = applyBattleEvents(events, false);
             if (result) auto.lastResult = result;
         }
