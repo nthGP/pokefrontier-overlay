@@ -260,6 +260,37 @@
         .sk-controls { display: flex; gap: 6px; align-items: center; }
         .sk-controls .grow { flex: 1; }
 
+        /* ---------- Damage calc ---------- */
+        .calc {
+            display: grid; gap: 12px; margin: 0 8px 10px; width: 760px; max-width: calc(100% - 16px); padding: 12px 16px 14px;
+            background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: 0 2px 10px var(--shadow);
+        }
+        body.display .calc { background: var(--panel); max-width: none; margin: 0; }
+        .cc-controls { display: grid; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+        .cc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+        .cc-row b { font: 600 12px var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); min-width: 52px; }
+        .cc-row select, .cc-row input[type=text] { height: 24px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+            border-radius: var(--r-sm); padding: 0 4px; font: 600 12.5px var(--font-body); }
+        .cc-row input[type=text] { width: 40px; text-align: right; }
+        .cc-boost { display: inline-flex; align-items: center; gap: 2px; }
+        .cc-boost select { width: 44px; }
+        .cc-boost select.up { color: var(--accent); }
+        .cc-boost select.down { color: var(--warn); }
+        .cc-notes { font-size: 11.5px; color: var(--faint); }
+        .cc-cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 36px; }
+        .cc-col h4 { margin: 0 0 6px; font: 700 15px var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+        .cc-list { display: grid; grid-template-columns: minmax(130px, max-content) 1fr; gap: 4px 14px; align-items: center; }
+        .cc-move { padding: 3px 10px; border-radius: 4px; color: #fff; font: 600 15px var(--font-body); text-align: center; white-space: nowrap;
+            text-shadow: 0 1px 1px rgba(0,0,0,.35); border: 2px solid transparent; }
+        .cc-move.unk { background: var(--surface-3); color: var(--faint); text-shadow: none; }
+        .cc-move.sel { border-color: var(--ink); box-shadow: 0 0 0 2px var(--accent); }
+        body:not(.display) .cc-move:not(.unk) { cursor: pointer; }
+        .cc-pct { font: 600 16px var(--font-body); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+        .cc-pct.dim { color: var(--faint); }
+        .cc-pct.ko { color: var(--accent); }
+        .cc-head { font: 700 17px/1.3 var(--font-body); color: var(--ink); }
+        .cc-rolls { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+        .cc-empty { color: var(--muted); font-size: 13px; }
         /* OBS fill mode (opponent source): the panel fills its box exactly */
         body.display.fill #stage { display: flex; flex-direction: column; overflow: hidden; }
         body.display.fill .head { flex: none; }
@@ -375,6 +406,7 @@
         <button class="icon-btn" id="clearBtn" title="Clear the picked Pokémon (Esc)">Clear</button>
         <button class="icon-btn" id="pickerBtn" title="Show or hide the Pokémon picker">Picker</button>
         <button class="icon-btn hidden" id="autoBtn" title="Auto mode: follow the game's chat log">Auto</button>
+        <button class="icon-btn" id="calcBtn" title="Show or hide the damage calc">Calc</button>
         <button class="icon-btn" id="teamBtn" title="Show or hide your team at the bottom">Team</button>
         <button class="icon-btn" id="themeBtn" title="Colours">Theme</button>
         <button class="icon-btn hidden" id="obsBtn" title="Copy the address for an OBS Browser Source">OBS</button>
@@ -410,12 +442,14 @@
     <div class="slots" id="slots"><div class="status">Loading data…</div></div>
     <div class="team" id="team"></div>
     <div class="streak" id="streak"></div>
+    <div class="calc" id="calc"></div>
     <div id="dialog"></div>
     <div class="note" id="note"></div>
     <div class="foot" id="foot"></div>
 </div>
 
 <script src="battlelog.js"></script>
+<script src="calc.js"></script>
 <script>
 // ============================================================
 // Setup
@@ -525,6 +559,9 @@ const DEFAULT_STATE = {
     factoryTeam: [],       // rentals: [{ species, set_id }]
     records: {},           // streaks: { "tower|singles|50": { streak, pb, wr } }
     auto: { on: false, dir: '', streak: true },   // auto mode: follow the game's chat log
+    showCalc: true,
+    // damage calc: which of your Pokémon / which opponent pick, their set, stat boosts, HP %, field, selected move
+    calc: { mine: 0, foe: 0, foeSet: null, boosts: { mine: {}, foe: {} }, hp: { mine: 100, foe: 100 }, weather: '', crit: false, sel: null },
     theme: { ...DEFAULT_THEME },
 };
 let state = loadState();
@@ -532,7 +569,8 @@ let state = loadState();
 function loadState() {
     try {
         const saved = JSON.parse(localStorage.getItem('overlayState') || 'null');
-        if (saved) return { ...DEFAULT_STATE, ...saved, auto: { ...DEFAULT_STATE.auto, ...(saved.auto || {}) } };
+        if (saved) return { ...DEFAULT_STATE, ...saved, auto: { ...DEFAULT_STATE.auto, ...(saved.auto || {}) },
+                            calc: { ...DEFAULT_STATE.calc, ...(saved.calc || {}) } };
     } catch (e) {}
     return { ...DEFAULT_STATE };
 }
@@ -590,7 +628,7 @@ async function init() {
         ]);
     } catch (e) {
         document.getElementById('slots').innerHTML = `<div class="status">Couldn't load the set data. Check your connection and restart the app.</div>`;
-        console.error(e);
+        console.error(e.stack);
         return;
     }
     for (const s of sets) {
@@ -849,6 +887,7 @@ function render() {
     renderSlots();
     renderTeam();
     renderStreak();
+    renderCalc();
     renderNote();
     applyZoom();
 }
@@ -874,6 +913,7 @@ function syncControls() {
     document.getElementById('roundNum').textContent = state.round >= FACTORY_MAX_ROUND ? FACTORY_MAX_ROUND + '+' : state.round;
     document.getElementById('pickerBtn').classList.toggle('on', state.showPicker);
     document.getElementById('teamBtn').classList.toggle('on', state.showTeam);
+    document.getElementById('calcBtn').classList.toggle('on', state.showCalc);
     const t = currentTrainer();
     const input = document.getElementById('trainerInput');
     if (document.activeElement !== input) input.value = t ? `${t.name} #${trainerNo(t)}` : '';
@@ -906,6 +946,8 @@ function wireControls() {
     document.getElementById('clearBtn').onclick = () => commit({ picks: [] });
     document.getElementById('pickerBtn').onclick = () => commit({ showPicker: !state.showPicker });
     document.getElementById('teamBtn').onclick = () => commit({ showTeam: !state.showTeam });
+    document.getElementById('calcBtn').onclick = () => commit({ showCalc: !state.showCalc });
+    wireCalc();
     wireTeam();
     document.getElementById('zoomIn').onclick = () => commit({ zoom: Math.min(1.6, +(state.zoom + 0.1).toFixed(2)) });
     document.getElementById('zoomOut').onclick = () => commit({ zoom: Math.max(0.6, +(state.zoom - 0.1).toFixed(2)) });
@@ -1017,7 +1059,7 @@ function applyZoom() {
         stage.style.zoom = 1;
         const w = stage.getBoundingClientRect().width, h = stage.getBoundingClientRect().height;
         // The streak panel is simple enough to blow up big; everything else stops at 1.5x
-        return w && h ? Math.min(window.innerWidth / w, window.innerHeight / h, PART === 'streak' ? 4 : 1.5) : 1;
+        return w && h ? Math.min(window.innerWidth / w, window.innerHeight / h, PART === 'streak' || PART === 'calc' ? 4 : 1.5) : 1;
     };
     if (FILL) { document.body.classList.remove('fill'); stage.style.width = stage.style.height = ''; }
     if (FILL && PART === 'team') {
@@ -1093,18 +1135,20 @@ function parseShowdown(text) {
         let [head, item] = lines[0].split(/\s+@\s+/);
         head = head.replace(/\s*\((M|F)\)\s*$/, '').trim();
         const named = head.match(/\(([^()]+)\)\s*$/);           // "Nickname (Species)"
-        const mon = { species: (named ? named[1] : head).trim(), item: item ? item.trim() : null,
-                      ability: null, nature: null, moves: [], evs: null };
+        const mon = { species: (named ? named[1] : head).trim(), nickname: named ? head.slice(0, named.index).trim() : null,
+                      item: item ? item.trim() : null, ability: null, nature: null, moves: [], evs: null, ivs: null };
         for (const l of lines.slice(1)) {
             if (l.startsWith('-')) mon.moves.push(l.replace(/^-\s*/, '').trim());
             else if (/^Ability:/i.test(l)) mon.ability = l.slice(l.indexOf(':') + 1).trim();
             else if (/\sNature$/i.test(l)) mon.nature = l.replace(/\s+Nature$/i, '').trim();
-            else if (/^EVs:/i.test(l)) {
-                mon.evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+            else if (/^(EVs|IVs):/i.test(l)) {
+                // EVs default to 0, IVs to 31
+                const ev = /^EVs/i.test(l), out = ev ? { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } : { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
                 for (const part of l.slice(4).split('/')) {
                     const m = part.trim().match(/^(\d+)\s+(\w+)/);
-                    if (m && STAT_KEYS[m[2].toLowerCase()]) mon.evs[STAT_KEYS[m[2].toLowerCase()]] = +m[1];
+                    if (m && STAT_KEYS[m[2].toLowerCase()]) out[STAT_KEYS[m[2].toLowerCase()]] = +m[1];
                 }
+                mon[ev ? 'evs' : 'ivs'] = out;
             }
         }
         mon.moves = mon.moves.slice(0, 4);
@@ -1123,7 +1167,8 @@ function resolveTeam() {
         return state.factoryTeam.slice(0, slotCount()).map(f => {
             const set = (setsBySpecies.get(f.species) || []).find(s => s.set_id === f.set_id);
             return set ? { species: set.pokemon, item: set.item, ability: set.ability, nature: set.nature,
-                           moves: set.moves.filter(m => m && m.trim()), setId: set.set_id } : { species: f.species, moves: [] };
+                           moves: set.moves.filter(m => m && m.trim()), setId: set.set_id,
+                           evs: set.evs, ivs: set.ivs } : { species: f.species, moves: [] };
         });
     }
     const t = currentTowerTeam();
@@ -1195,6 +1240,7 @@ function openObsDialog(base) {
         ['Opponent only', base + '&part=opponent', 'For a narrow, tall column add &cols=2 (two sets per row).'],
         ['Team only', base + '&part=team', 'Your team on its own, anywhere in your layout.'],
         ['Streak only', base + '&part=streak', 'Facility, format and the streak bar with your PB and the WR.'],
+        ['Damage calc only', base + '&part=calc', 'Your Pokémon vs theirs: both move lists and the selected move. Same box as the streak works well.'],
     ];
     document.getElementById('dialog').innerHTML = `<div class="dialog-back" id="dlgBack"><div class="dialog" role="dialog" aria-label="OBS" style="width:min(620px,100%)">
         <div class="row"><h2 class="grow">Show it in OBS</h2><button class="btn" id="dlgClose">Done</button></div>
@@ -1519,6 +1565,7 @@ function broadcast() {
     payload.myTeam = resolveTeam();
     payload.teamName = teamTitle();
     payload.streakView = currentRecord();
+    payload.calcView = calcView();
     TAURI.core.invoke('set_overlay_state', { state: JSON.stringify(payload) }).catch(() => {});
 }
 
@@ -1611,6 +1658,7 @@ function autoStatus(text, error = false) {
 function applyBattleEvents(events, replay) {
     let changed = false, result = null;
     for (const e of events) {
+        if (['mySentOut', 'boost', 'clearBoosts'].includes(e.type)) { calcFollow(e); changed = true; continue; }
         if (e.type === 'challenge') {
             auto.battle = { index: e.index, trainer: e.trainer, started: false };
             if (state.facility === 'tower') {
@@ -1632,6 +1680,7 @@ function applyBattleEvents(events, replay) {
                 if (state.picks.length >= slotCount()) state.picks.shift();
                 state.picks.push({ species, locked: null, revealed: [] });
             }
+            calcFollow(e);
             changed = true;
         } else if (e.type === 'foeMove') {
             if (/^struggle$/i.test(e.move)) continue;
@@ -1744,6 +1793,228 @@ function openAutoDialog() {
         if (guess) { document.getElementById('autoDir').value = guess; save(true); }
         else autoStatus("Couldn't find PokeMMO's log folder. Paste its address (it's the 'log' folder inside the game's folder).", true);
     };
+}
+
+// ============================================================
+// Damage calc: your Pokémon vs the opponent's, with the PokeMMO calc engine (calc.js, from nthGP/pokemmo-damage-calc).
+// The app works it out; OBS (&part=calc) only draws the result it's sent.
+// ============================================================
+const CALC_ITEM_FIX = { 'leek': 'Stick', 'notlum': null, 'assaultgear': 'Assault Vest', 'covertmantle': 'Covert Cloak' };
+const CALC_MOVE_FIX = { 'faintattack': 'Feint Attack' };
+const STAT_NAMES = [['atk', 'Atk'], ['def', 'Def'], ['spa', 'SpA'], ['spd', 'SpD'], ['spe', 'Spe']];
+let calcGenCache = null;
+const calcGen = () => calcGenCache || (window.Calc ? (calcGenCache = window.Calc.Generations.get(5)) : null);
+const calcSpecies = sp => String(sp).replace(/♀/g, '-F').replace(/♂/g, '-M');
+
+// The Pokémon on each side, the opponent's set, and the sets it could be
+function calcSides() {
+    const c = state.calc;
+    const team = resolveTeam();
+    const mine = team[c.mine] || team[0] || null;
+    const pick = state.picks[c.foe] || state.picks[0] || null;
+    let foeSet = null, options = [];
+    if (pick) {
+        options = candidates(pick.species).filter(x => x.set).map(x => x.set);
+        const chosen = pick.locked != null ? pick.locked : (c.foeSets || {})[pick.species];
+        foeSet = options.find(x => x.set_id === chosen)
+              || options.find(x => !setFit(x, pick.revealed, pick.item)) || options[0] || null;
+    }
+    return { team, mine, pick, foeSet, options };
+}
+
+// A calc Pokémon from a team member or a set. Unknown names are left out and reported, never guessed.
+function calcPokemon(src, boosts, hpPct, notes, who, foe) {
+    const C = window.Calc, gen = calcGen();
+    const id = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const iv = src.ivs;
+    const ivs = typeof iv === 'number' ? { hp: iv, atk: iv, def: iv, spa: iv, spd: iv, spe: iv }
+              : { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...(iv || {}) };
+    const opts = { level: state.level, nature: src.nature || 'Hardy', evs: src.evs || {}, ivs, boosts: boosts || {} };
+    if (foe && !src.nature) notes.push(`${who}: nature unscouted (neutral used)`);
+    if (src.item) {
+        const fixed = id(src.item) in CALC_ITEM_FIX ? CALC_ITEM_FIX[id(src.item)] : src.item;
+        if (fixed && gen.items.get(id(fixed))) opts.item = fixed;
+        else if (fixed) notes.push(`${who}: item "${src.item}" not in the calc`);
+    } else if (foe) notes.push(`${who}: item unscouted`);
+    if (src.ability) {
+        if (gen.abilities.get(id(src.ability))) opts.ability = src.ability;
+        else notes.push(`${who}: ability "${src.ability}" not in the calc`);
+    } else if (foe) notes.push(`${who}: ability unscouted`);
+    let mon = new C.Pokemon(gen, calcSpecies(src.species || src.pokemon), opts);
+    const pct = Math.max(1, Math.min(100, +hpPct || 100));
+    if (pct < 100) mon = new C.Pokemon(gen, calcSpecies(src.species || src.pokemon), { ...opts, curHP: Math.max(1, Math.floor(mon.maxHP() * pct / 100)) });
+    return mon;
+}
+
+// Every move of `att` against `def`
+function calcMoves(att, def, moveNames, field) {
+    const C = window.Calc, gen = calcGen();
+    const out = [];
+    for (let i = 0; i < 4; i++) {
+        const raw = (moveNames[i] || '').trim();
+        if (!raw) { out.push({ name: '?', unk: true }); continue; }
+        const key = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const name = CALC_MOVE_FIX[key] || raw;
+        try {
+            const move = new C.Move(gen, name, { isCrit: !!state.calc.crit });
+            const type = move.type;
+            if (move.category === 'Status') { out.push({ name: raw, type, status: true }); continue; }
+            const res = C.calculate(gen, att, def, move, field);
+            const [lo, hi] = res.range();
+            const hp = res.defender.maxHP();
+            let desc = '', rolls = [];
+            try { desc = res.fullDesc(); } catch (e) { desc = ''; }
+            if (Array.isArray(res.damage) && res.damage.every(x => typeof x === 'number')) rolls = res.damage;
+            out.push({ name: raw, type, lo: lo / hp * 100, hi: hi / hp * 100, ko: lo >= def.curHP(), desc, rolls });
+        } catch (e) {
+            out.push({ name: raw, unk: true, err: true });
+        }
+    }
+    return out;
+}
+
+// What the panel shows (also what OBS gets)
+function calcView() {
+    if (DISPLAY) return state.calcView || null;
+    if (!calcGen()) return null;
+    const { mine, pick, foeSet } = calcSides();
+    if (!mine || !pick || !foeSet) return { empty: !mine ? 'Add your team to use the calc.' : 'Pick the opponent\'s Pokémon to use the calc.' };
+    const c = state.calc, notes = [];
+    try {
+        const A = calcPokemon(mine, c.boosts.mine, c.hp.mine, notes, mine.species);
+        const B = calcPokemon(foeSet, c.boosts.foe, c.hp.foe, notes, `${foeSet.pokemon}-${foeSet.set_id}`, true);
+        const field = new window.Calc.Field({ gameType: state.format === 'doubles' ? 'Doubles' : 'Singles', weather: c.weather || undefined });
+        const mineMoves = calcMoves(A, B, mine.moves || [], field);
+        const foeMoves = calcMoves(B, A, foeSet.moves || [], field);
+        if (foeSet.moves.some(m => !m || !m.trim())) notes.push(`${foeSet.pokemon}-${foeSet.set_id}: unscouted move slot(s)`);
+        // Selected move: the one clicked, else your hardest-hitting one
+        let sel = c.sel && (c.sel.side === 'mine' ? mineMoves : foeMoves)[c.sel.i] && !(c.sel.side === 'mine' ? mineMoves : foeMoves)[c.sel.i].unk ? c.sel : null;
+        if (!sel) {
+            let best = -1;
+            mineMoves.forEach((m, i) => { if (m.hi != null && m.hi > best) { best = m.hi; sel = { side: 'mine', i }; } });
+        }
+        const s = sel && (sel.side === 'mine' ? mineMoves : foeMoves)[sel.i];
+        return {
+            mine: { name: mine.species, moves: mineMoves },
+            foe: { name: foeSet.pokemon, moves: foeMoves },
+            sel, desc: s && s.desc || '', rolls: s && s.rolls || [], notes: [...new Set(notes)],
+        };
+    } catch (e) {
+        console.error(e.stack);
+        return { empty: "Couldn't calc this matchup: " + e.message };
+    }
+}
+
+const fmtPct = v => (Math.round(v * 10) / 10).toFixed(1);
+
+function calcColumn(side, data, sel) {
+    const rows = data.moves.map((m, i) => {
+        const cls = ['cc-move', m.unk ? 'unk' : 't-' + (m.type || 'Unknown'), sel && sel.side === side && sel.i === i ? 'sel' : ''].join(' ');
+        const pct = m.unk ? '<span class="cc-pct dim">?</span>'
+                  : m.status ? '<span class="cc-pct dim">—</span>'
+                  : `<span class="cc-pct${m.ko ? ' ko' : ''}">${fmtPct(m.lo)} – ${fmtPct(m.hi)}%</span>`;
+        return `<span class="${cls}" data-cside="${side}" data-ci="${i}">${esc(m.name)}</span>${pct}`;
+    }).join('');
+    return `<div class="cc-col"><h4>${esc(data.name)}'s moves</h4><div class="cc-list">${rows}</div></div>`;
+}
+
+function calcControls(sides, view) {
+    const c = state.calc;
+    const boostSel = (side, k, label) => {
+        const v = (c.boosts[side] || {})[k] || 0;
+        const opts = [];
+        for (let b = 6; b >= -6; b--) opts.push(`<option value="${b}"${b === v ? ' selected' : ''}>${b > 0 ? '+' + b : b}</option>`);
+        return `<span class="cc-boost">${label}<select data-boost="${side}.${k}" class="${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${opts.join('')}</select></span>`;
+    };
+    const boosts = side => STAT_NAMES.map(([k, l]) => boostSel(side, k, l)).join('');
+    const mineOpts = sides.team.map((m, i) => `<option value="${i}"${m === sides.mine ? ' selected' : ''}>${esc(m.nickname ? `${m.nickname} (${m.species})` : m.species)}</option>`).join('');
+    const foeOpts = state.picks.map((p, i) => `<option value="${i}"${p === sides.pick ? ' selected' : ''}>${esc(p.species)}</option>`).join('');
+    const setOpts = sides.options.map(x => `<option value="${x.set_id}"${x === sides.foeSet ? ' selected' : ''}>Set ${x.set_id}${x.item ? ' · ' + esc(x.item) : ''}${x.nature ? ' · ' + esc(x.nature) : ''}</option>`).join('');
+    const weathers = ['', 'Sun', 'Rain', 'Sand', 'Hail'].map(w => `<option value="${w}"${w === (c.weather || '') ? ' selected' : ''}>${w || 'No weather'}</option>`).join('');
+    return `<div class="cc-controls">
+        <div class="cc-row"><b>Yours</b>${sides.team.length ? `<select data-cfield="mine">${mineOpts}</select>` : '<span>No team</span>'}
+            HP <input type="text" data-hp="mine" value="${c.hp.mine}">% ${boosts('mine')}</div>
+        <div class="cc-row"><b>Theirs</b>${state.picks.length ? `<select data-cfield="foe">${foeOpts}</select>` : '<span>No Pokémon picked</span>'}
+            ${sides.options.length > 1 ? `<select data-cfield="foeSet">${setOpts}</select>` : ''}
+            HP <input type="text" data-hp="foe" value="${c.hp.foe}">% ${boosts('foe')}</div>
+        <div class="cc-row"><b>Field</b><select data-cfield="weather">${weathers}</select>
+            <label><input type="checkbox" data-cfield="crit"${c.crit ? ' checked' : ''}> Critical hit</label>
+            <span class="grow"></span><button class="icon-btn" id="ccReset" title="Reset boosts and HP">Reset</button></div>
+        ${view && view.notes && view.notes.length ? `<div class="cc-notes">${view.notes.map(esc).join(' · ')}</div>` : ''}
+    </div>`;
+}
+
+function renderCalc() {
+    const box = document.getElementById('calc');
+    const show = DISPLAY ? PART === 'calc' : state.showCalc;
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const view = calcView();
+    const sides = DISPLAY ? null : calcSides();
+    let body;
+    if (!view) body = `<div class="cc-empty">The calc isn't available.</div>`;
+    else if (view.empty) body = DISPLAY ? '' : `<div class="cc-empty">${esc(view.empty)}</div>`;
+    else body = `<div class="cc-cols">${calcColumn('mine', view.mine, view.sel)}${calcColumn('foe', view.foe, view.sel)}</div>
+        ${view.desc ? `<div><div class="cc-head">${esc(view.desc)}</div>
+        ${view.rolls.length ? `<div class="cc-rolls">Possible damage amounts: (${view.rolls.join(', ')})</div>` : ''}</div>` : ''}`;
+    box.innerHTML = (DISPLAY ? '' : calcControls(sides, view)) + body;
+    // In its own OBS source the panel takes the box's shape, like the streak panel
+    if (DISPLAY && PART === 'calc') {
+        const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+        box.style.width = '';
+        for (let i = 0; i < 2; i++) box.style.width = Math.max(560, Math.round(box.offsetHeight * aspect)) + 'px';
+    }
+}
+
+function wireCalc() {
+    const box = document.getElementById('calc');
+    const set = patch => { state.calc = { ...state.calc, ...patch }; commit(); };
+    box.addEventListener('click', e => {
+        const mv = e.target.closest('.cc-move[data-cside]');
+        if (mv && !mv.classList.contains('unk')) return set({ sel: { side: mv.dataset.cside, i: +mv.dataset.ci } });
+        if (e.target.id === 'ccReset') set({ boosts: { mine: {}, foe: {} }, hp: { mine: 100, foe: 100 } });
+    });
+    box.addEventListener('change', e => {
+        const t = e.target, c = state.calc;
+        if (t.dataset.boost) {
+            const [side, k] = t.dataset.boost.split('.');
+            return set({ boosts: { ...c.boosts, [side]: { ...c.boosts[side], [k]: +t.value } } });
+        }
+        if (t.dataset.hp) {
+            const v = Math.max(1, Math.min(100, parseInt(t.value, 10) || 100));
+            return set({ hp: { ...c.hp, [t.dataset.hp]: v } });
+        }
+        const f = t.dataset.cfield;
+        if (f === 'mine') return set({ mine: +t.value, boosts: { ...c.boosts, mine: {} }, hp: { ...c.hp, mine: 100 }, sel: null });
+        if (f === 'foe') return set({ foe: +t.value, boosts: { ...c.boosts, foe: {} }, hp: { ...c.hp, foe: 100 }, sel: null });
+        if (f === 'foeSet') { const pick = state.picks[c.foe] || state.picks[0]; return set({ foeSets: { ...(c.foeSets || {}), [pick.species]: +t.value } }); }
+        if (f === 'weather') return set({ weather: t.value });
+        if (f === 'crit') return set({ crit: t.checked });
+    });
+}
+
+// Auto mode hooks: who's out, and stat changes from the log
+function calcFollow(e) {
+    const c = state.calc;
+    if (e.type === 'foeSentOut') {
+        const i = state.picks.findIndex(p => p.species === dataSpecies(e.species[0]));
+        if (i >= 0) state.calc = { ...c, foe: i, boosts: { ...c.boosts, foe: {} }, hp: { ...c.hp, foe: 100 }, sel: null };
+    } else if (e.type === 'mySentOut') {
+        const team = resolveTeam();
+        const i = team.findIndex(m => e.names.some(n => norm(n) === norm(m.nickname) || norm(n) === norm(m.species)));
+        if (i >= 0) state.calc = { ...c, mine: i, boosts: { ...c.boosts, mine: {} }, hp: { ...c.hp, mine: 100 }, sel: null };
+    } else if (e.type === 'clearBoosts') {
+        state.calc = { ...c, boosts: { mine: {}, foe: {} } };
+    } else if (e.type === 'boost') {
+        const side = e.foe ? 'foe' : 'mine';
+        const sides = calcSides();
+        const target = e.foe ? sides.pick && sides.pick.species : sides.mine && (sides.mine.nickname || sides.mine.species);
+        const alt = !e.foe && sides.mine ? sides.mine.species : null;
+        if (!target || (norm(e.name) !== norm(target) && norm(e.name) !== norm(alt))) return;
+        const b = { ...c.boosts[side] };
+        for (const k of e.stats) b[k] = Math.max(-6, Math.min(6, e.set != null ? e.set : (b[k] || 0) + e.by));
+        state.calc = { ...c, boosts: { ...c.boosts, [side]: b } };
+    }
 }
 
 // Compare "1.2.10" style versions

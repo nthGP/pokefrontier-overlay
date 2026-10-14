@@ -70,6 +70,16 @@ When a new version is out, an **Update** button appears in the top bar.
 - Each facility, format and level keeps its own numbers. Passing your PB raises it.
 - In Factory the round follows the streak (7 wins per round).
 
+**Damage calc** (under the streak; **Calc** in the bar hides it)
+- Pick **Yours** (from your team) and **Theirs** (from the opponent's Pokémon, and which set if it could be several).
+  Both move lists show the damage range; click any move to see its full calc and every damage roll.
+- Set stat boosts (−6 to +6), HP %, weather and critical hits. Doubles uses the Doubles spread rules.
+- In auto mode it follows the battle: whoever is sent out on either side, stat changes the log reports ("…'s Attack rose!")
+  and Haze. Your Pokémon are matched by nickname or species, so keep nicknames in your Showdown paste.
+- Unscouted parts of a set (nature, item, ability, moves) are listed under the controls; a blank nature is calculated as neutral.
+- On stream: a Browser Source with `&part=calc` the same size as the streak's, and switch scenes between them.
+- Uses the PokeMMO damage calc engine (nthGP/pokemmo-damage-calc, based on Smogon's calc).
+
 **Theme**: click **Theme** for six presets, or pick your own accent and background colours.
 
 **Window**
