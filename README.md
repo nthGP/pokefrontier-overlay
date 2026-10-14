@@ -16,9 +16,10 @@ When a new version is out, an **Update** button appears in the top bar.
 
 ## Use
 
-**Battle Tower**
-1. Pick **Singles** (3 Pokémon) or **Doubles** (4).
-2. Type the opponent's name (or class, or trainer number) and press Enter.
+**Battle Tower, Arena and Palace** (same trainers and sets; each keeps its own streak)
+1. Pick the facility, then **Singles** (3 Pokémon) or **Doubles** (4). Tower also has **Multi** (with an NPC partner)
+   and **Co-op** (with another player): doubles against two trainers, 2 Pokémon each, and you bring 2.
+2. Type the opponent's name (or class, or trainer number) and press Enter. In Multi / Co-op pick both opponents, one after the other.
 3. Click the Pokémon they send out, or type its name in *Add Pokémon…* and press Enter.
    Each row shows only the sets that trainer can bring.
 
@@ -36,7 +37,8 @@ When a new version is out, an **Update** button appears in the top bar.
 1. In PokeMMO, turn on the option to log chat to disk.
 2. In the app, click **Auto**, tick **Follow the chat log**. The log folder is found by itself (normally
    `C:\Program Files\PokeMMO\log`); if not, paste the game's `log` folder and press Enter.
-3. Play. When a trainer challenges you the app picks them (by their Tower number) and sets Singles or Doubles; each
+3. Play. When a trainer challenges you the app picks them (by their Tower number) and sets Singles or Doubles
+   (two trainers at once switches to Multi unless you've set Co-op; your Multi partner's Pokémon are ignored); each
    Pokémon they send out is added and the moves they use are marked. Wins and losses go on the streak bar (untick
    **Count wins and losses on the streak** to do that by hand).
 - Only battle messages are read. Team, whisper and global chat are skipped inside the app and never shown, saved or sent.
@@ -45,7 +47,7 @@ When a new version is out, an **Update** button appears in the top bar.
 
 **Your team** (bottom of the overlay; **Team** in the bar hides it)
 - **Tower:** click **Add a team** / **Edit teams**, give it a name and paste the team from Showdown (Export), or type it
-  in the same format. Save as many teams as you like and pick one from the dropdown. Singles shows the first 3, doubles the first 4.
+  in the same format. Save as many teams as you like and pick one from the dropdown. Singles shows the first 3, doubles the first 4, Multi / Co-op the first 2.
 - **Factory:** click **+ Add rental**, type the Pokémon and pick the set you rented (this round's sets come first).
   Click a rental to swap it after a battle.
 - Teams are saved on your PC. Use the main-game item names (as in Showdown); every held item has an icon.
@@ -68,6 +70,7 @@ When a new version is out, an **Update** button appears in the top bar.
 **Streak** (under your team in the app)
 - **Won +1** after each win, **Lost** (click twice) when the streak ends, **Edit** to type the streak, your PB and the WR.
 - Each facility, format and level keeps its own numbers. Passing your PB raises it.
+- **View → Streak** hides the panel in the app; the OBS streak source keeps showing it.
 - In Factory the round follows the streak (7 wins per round).
 
 **Damage calc** (right-hand column; **Calc** in the bar hides it)

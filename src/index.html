@@ -77,6 +77,10 @@
         .icon-btn:hover { color: var(--ink); border-color: var(--faint); }
         .icon-btn.on { color: var(--accent); border-color: var(--accent); }
         .icon-btn.err { color: var(--warn); border-color: var(--warn); }
+        .menu-wrap { position: relative; display: inline-flex; flex: none; }
+        .menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; display: grid; gap: 4px; min-width: 110px; padding: 6px;
+            background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-sm); box-shadow: 0 6px 18px var(--shadow); }
+        .menu .icon-btn { text-align: left; }
         .auto-status { font-size: 12.5px; color: var(--muted); background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 10px; }
         .auto-status.err { color: var(--warn); }
         .icon-btn svg { width: 14px; height: 14px; }
@@ -415,11 +419,15 @@
     <div class="bar" id="bar" data-tauri-drag-region>
         <div class="seg" id="facilitySeg">
             <button data-v="tower">Tower</button>
+            <button data-v="arena">Arena</button>
+            <button data-v="palace">Palace</button>
             <button data-v="factory">Factory</button>
         </div>
         <div class="seg" id="formatSeg">
             <button data-v="singles">Singles</button>
             <button data-v="doubles">Doubles</button>
+            <button data-v="multi" data-tower-only title="Doubles with an NPC partner, against two trainers">Multi</button>
+            <button data-v="coop" data-tower-only title="Doubles with another player, against two trainers">Co-op</button>
         </div>
 
         <div class="search" id="trainerBox">
@@ -442,10 +450,16 @@
         <span class="spacer" data-tauri-drag-region></span>
         <button class="icon-btn update hidden" id="updateBtn" title="A newer version is available">Update</button>
         <button class="icon-btn" id="clearBtn" title="Clear the picked Pokémon (Esc)">Clear</button>
-        <button class="icon-btn" id="pickerBtn" title="Show or hide the Pokémon picker">Picker</button>
         <button class="icon-btn hidden" id="autoBtn" title="Auto mode: follow the game's chat log">Auto</button>
-        <button class="icon-btn" id="calcBtn" title="Show or hide the damage calc">Calc</button>
-        <button class="icon-btn" id="teamBtn" title="Show or hide your team at the bottom">Team</button>
+        <span class="menu-wrap">
+            <button class="icon-btn" id="viewBtn" title="Show or hide parts of the app">View ▾</button>
+            <div class="menu hidden" id="viewMenu">
+                <button class="icon-btn" id="pickerBtn" title="Show or hide the Pokémon picker">Picker</button>
+                <button class="icon-btn" id="teamBtn" title="Show or hide your team (also in OBS)">Team</button>
+                <button class="icon-btn" id="streakBtn" title="Show or hide the streak panel here (OBS keeps showing it)">Streak</button>
+                <button class="icon-btn" id="calcBtn" title="Show or hide the damage calc here (OBS keeps showing it)">Calc</button>
+            </div>
+        </span>
         <button class="icon-btn" id="themeBtn" title="Colours">Theme</button>
         <button class="icon-btn hidden" id="obsBtn" title="Copy the address for an OBS Browser Source">OBS</button>
         <button class="icon-btn" id="zoomOut" title="Smaller">A−</button>
@@ -591,7 +605,7 @@ function applyTheme(theme) {
 
 const DEFAULT_STATE = {
     facility: 'tower', format: 'singles',
-    trainerId: null,
+    trainerId: null, trainerId2: null,
     level: 50, round: 1,
     picks: [],           // [{ species, locked: setId|null, revealed: [move names] }]
     showPicker: true, zoom: 1,
@@ -601,7 +615,7 @@ const DEFAULT_STATE = {
     factoryTeam: [],       // rentals: [{ species, set_id }]
     records: {},           // streaks: { "tower|singles|50": { streak, pb, wr } }
     auto: { on: false, dir: '', streak: true },   // auto mode: follow the game's chat log
-    showCalc: true,
+    showCalc: true, showStreak: true,
     // damage calc: which of your Pokémon / which opponent pick, their set, stat boosts, HP %, field, selected move
     calc: { mine: 0, foe: 0, foeSets: {}, boosts: { mine: {}, foe: {} }, hp: { mine: 100, foe: 100 }, weather: '', gravity: false,
             sides: { mine: {}, foe: {} }, edits: {}, sel: null },
@@ -620,10 +634,22 @@ function loadState() {
 
 const norm = s => String(s || '').toLowerCase().replace(/♀/g, 'f').replace(/♂/g, 'm').replace(/[^a-z0-9]/g, '');
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const slotCount = () => state.format === 'doubles' ? 4 : 3;
+// Tower, Arena and Palace all use the Tower trainers and sets; Factory is rentals
+const FACILITY_NAMES = { tower: 'Battle Tower', arena: 'Battle Arena', palace: 'Battle Palace', factory: 'Battle Factory' };
+const FORMAT_NAMES = { singles: 'Singles', doubles: 'Doubles', multi: 'Multi', coop: 'Co-op' };
+const facilityName = () => FACILITY_NAMES[state.facility] || 'Battle Tower';
+const formatName = () => FORMAT_NAMES[state.format] || 'Singles';
+const usesTrainers = () => state.facility !== 'factory';
+// Multi (NPC partner) and Co-op (player partner) are Tower doubles against two trainers, 2 Pokémon each
+const isPair = () => state.format === 'multi' || state.format === 'coop';
+const isDoubles = () => state.format !== 'singles';
+const slotCount = () => state.format === 'singles' ? 3 : 4;
+const teamCount = () => isPair() ? 2 : slotCount();
 const trainerNo = t => parseInt(t.id.split('_').pop(), 10);
 const trainerIV = t => (TOWER_TIERS.find(([last]) => trainerNo(t) <= last) || [0, null])[1];
 const currentTrainer = () => trainers.find(t => t.id === state.trainerId) || null;
+// Both opponents in Multi / Co-op, else just the one
+const currentTrainers = () => [state.trainerId, isPair() ? state.trainerId2 : null].map(id => trainers.find(t => t.id === id)).filter(Boolean);
 
 // ============================================================
 // Data
@@ -704,9 +730,9 @@ function candidates(species) {
         const tiers = FACTORY_ROUNDS[state.level][Math.min(state.round, FACTORY_MAX_ROUND) - 1];
         return all.filter(s => tiers.includes(s.ivs)).map(set => ({ set }));
     }
-    const t = currentTrainer();
-    if (!t) return all.map(set => ({ set }));
-    const entries = t.pokemon_pool.filter(e => e.pokemon === species);
+    const ts = currentTrainers();
+    if (!ts.length) return all.map(set => ({ set }));
+    const entries = ts.flatMap(t => t.pokemon_pool).filter(e => e.pokemon === species);
     const ids = [...new Set(entries.flatMap(e => e.sets))].sort((a, b) => a - b);
     const out = ids.map(id => {
         const set = all.find(s => s.set_id === id);
@@ -735,10 +761,10 @@ function pickerSpecies() {
         }
         return out.sort((a, b) => a.species.localeCompare(b.species));
     }
-    const t = currentTrainer();
-    if (!t) return [];
+    const ts = currentTrainers();
+    if (!ts.length) return [];
     // The number on each chip is how many set tiles that Pokémon shows
-    const species = [...new Set(t.pokemon_pool.map(e => e.pokemon))];
+    const species = [...new Set(ts.flatMap(t => t.pokemon_pool).map(e => e.pokemon))];
     return species.map(sp => ({ species: sp, n: candidates(sp).length })).sort((a, b) => a.species.localeCompare(b.species));
 }
 
@@ -864,12 +890,13 @@ function renderHead() {
             <span class="meta">${state.format} · <b>${tiers.join(' / ')} IV</b></span>`;
         return;
     }
-    const t = currentTrainer();
-    head.innerHTML = t
-        ? `<span class="label">Opponent</span><span class="name">${esc(t.name)}</span>
-           <span class="meta">${esc(t.class)} · #${trainerNo(t)} · ${state.format} · <b>${trainerIV(t)} IV</b></span>`
-        : `<span class="label">Battle Tower</span><span class="name">${DISPLAY ? '' : 'Pick an opponent'}</span>
-           <span class="meta">${state.format}</span>`;
+    const ts = currentTrainers();
+    const ivs = [...new Set(ts.map(trainerIV))].join(' / ');
+    head.innerHTML = ts.length
+        ? `<span class="label">${ts.length > 1 ? 'Opponents' : 'Opponent'}</span><span class="name">${ts.map(t => esc(t.name)).join(' & ')}</span>
+           <span class="meta">${ts.map(t => `${esc(t.class)} · #${trainerNo(t)}`).join(' & ')} · ${formatName()} · <b>${ivs} IV</b></span>`
+        : `<span class="label">${facilityName()}</span><span class="name">${DISPLAY ? '' : isPair() ? 'Pick the two opponents' : 'Pick an opponent'}</span>
+           <span class="meta">${formatName()}</span>`;
 }
 
 function renderPicker() {
@@ -878,7 +905,7 @@ function renderPicker() {
     if (DISPLAY) return;
     const chips = document.getElementById('chips');
     const hint = document.getElementById('pickerHint');
-    if (state.facility === 'tower' && !currentTrainer()) {
+    if (usesTrainers() && !currentTrainer()) {
         chips.innerHTML = `<div class="empty">Type the opponent's name above to see their pool.</div>`;
         hint.textContent = '';
         return;
@@ -890,7 +917,7 @@ function renderPicker() {
     // Factory pools are big: only show chips once you start typing, unless the pool is small
     const tooMany = state.facility === 'factory' && !q && list.length > 60;
     const picked = new Set(state.picks.map(p => p.species));
-    hint.textContent = `${state.picks.length}/${slotCount()} picked · ${total} species${state.facility === 'tower' ? ' in pool' : ' this round'}`;
+    hint.textContent = `${state.picks.length}/${slotCount()} picked · ${total} species${usesTrainers() ? ' in pool' : ' this round'}`;
     chips.innerHTML = tooMany
         ? `<div class="empty">${total} species can appear this round. Type a name to find one.</div>`
         : list.map((x, i) => {
@@ -912,7 +939,7 @@ function renderSlots() {
     let html = state.picks.slice(0, n).map(renderSlot).join('');
     if (!DISPLAY) for (let i = state.picks.length; i < n; i++) html += `<div class="slot blank">Slot ${i + 1}: pick a Pokémon</div>`;
     // OBS fill mode: Pokémon not sent out yet keep their row, as a quiet placeholder
-    if (FILL && currentTrainer()) for (let i = state.picks.length; i < n; i++) html += `<div class="slot pending"><span>?</span></div>`;
+    if (FILL && currentTrainers().length) for (let i = state.picks.length; i < n; i++) html += `<div class="slot pending"><span>?</span></div>`;
     box.innerHTML = html;
     box.classList.toggle('hidden', !showsPart('opponent'));
 }
@@ -922,7 +949,7 @@ function renderNote() {
     if (state.facility === 'factory') {
         note.textContent = 'Factory round → IV mapping is reported, not fully confirmed in-game (Lv 100 especially). Click a move to mark it revealed; click a set to lock it.';
     } else {
-        note.textContent = currentTrainer()
+        note.textContent = currentTrainers().length
             ? 'Set assignments come from the Emerald carry-over and are unconfirmed unless scouted. Click a move to mark it revealed; click a set to lock it.'
             : '';
     }
@@ -957,15 +984,19 @@ function syncControls() {
     setSeg('facilitySeg', state.facility);
     setSeg('formatSeg', state.format);
     setSeg('levelSeg', state.level);
-    document.getElementById('trainerBox').classList.toggle('hidden', state.facility !== 'tower');
+    document.getElementById('trainerBox').classList.toggle('hidden', !usesTrainers());
+    // Multi and Co-op are Tower only
+    document.querySelectorAll('#formatSeg [data-tower-only]').forEach(b => b.classList.toggle('hidden', state.facility !== 'tower'));
+    document.getElementById('streakBtn').classList.toggle('on', state.showStreak);
     document.getElementById('factoryBox').classList.toggle('hidden', state.facility !== 'factory');
     document.getElementById('roundNum').textContent = state.round >= FACTORY_MAX_ROUND ? FACTORY_MAX_ROUND + '+' : state.round;
     document.getElementById('pickerBtn').classList.toggle('on', state.showPicker);
     document.getElementById('teamBtn').classList.toggle('on', state.showTeam);
     document.getElementById('calcBtn').classList.toggle('on', state.showCalc);
-    const t = currentTrainer();
+    const ts = currentTrainers();
     const input = document.getElementById('trainerInput');
-    if (document.activeElement !== input) input.value = t ? `${t.name} #${trainerNo(t)}` : '';
+    input.placeholder = isPair() ? 'Both opponents: pick one, then the other' : 'NPC name, class or #';
+    if (document.activeElement !== input) input.value = ts.map(t => `${t.name} #${trainerNo(t)}`).join(' & ');
 }
 
 function addPick(species) {
@@ -986,7 +1017,10 @@ function wireSeg(id, key, conv = v => v) {
 function wireControls() {
     document.getElementById('facilitySeg').addEventListener('click', e => {
         const b = e.target.closest('button');
-        if (b && b.dataset.v !== state.facility) commit({ facility: b.dataset.v, picks: [] });
+        if (b && b.dataset.v !== state.facility) {
+            const format = b.dataset.v !== 'tower' && isPair() ? 'doubles' : state.format;   // Multi / Co-op are Tower only
+            commit({ facility: b.dataset.v, format, picks: [] });
+        }
     });
     wireSeg('formatSeg', 'format');
     wireSeg('levelSeg', 'level', Number);
@@ -996,6 +1030,10 @@ function wireControls() {
     document.getElementById('pickerBtn').onclick = () => commit({ showPicker: !state.showPicker });
     document.getElementById('teamBtn').onclick = () => commit({ showTeam: !state.showTeam });
     document.getElementById('calcBtn').onclick = () => commit({ showCalc: !state.showCalc });
+    document.getElementById('streakBtn').onclick = () => commit({ showStreak: !state.showStreak });
+    const viewMenu = document.getElementById('viewMenu');
+    document.getElementById('viewBtn').onclick = e => { e.stopPropagation(); viewMenu.classList.toggle('hidden'); };
+    document.addEventListener('mousedown', e => { if (!e.target.closest('.menu-wrap')) viewMenu.classList.add('hidden'); });
     wireCalc();
     wireTeam();
     document.getElementById('zoomIn').onclick = () => commit({ zoom: Math.min(1.6, +(state.zoom + 0.1).toFixed(2)) });
@@ -1076,7 +1114,10 @@ function wireTrainerSearch() {
     function pick(t) {
         list.classList.add('hidden');
         input.blur();
-        commit({ trainerId: t.id, picks: [] });
+        // Multi / Co-op: the first pick fills the first opponent, the next the second (then they take turns)
+        if (isPair() && state.trainerId && !state.trainerId2 && t.id !== state.trainerId) commit({ trainerId2: t.id });
+        else if (isPair() && state.trainerId && state.trainerId2) commit({ trainerId: state.trainerId2, trainerId2: t.id, picks: [] });
+        else commit({ trainerId: t.id, trainerId2: null, picks: [] });
         document.getElementById('monInput').focus();
     }
     function move(d) {
@@ -1224,7 +1265,7 @@ function currentTowerTeam() {
 function resolveTeam() {
     if (DISPLAY) return state.myTeam || [];
     if (state.facility === 'factory') {
-        return state.factoryTeam.slice(0, slotCount()).map(f => {
+        return state.factoryTeam.slice(0, teamCount()).map(f => {
             const set = (setsBySpecies.get(f.species) || []).find(s => s.set_id === f.set_id);
             return set ? { species: set.pokemon, item: set.item, ability: set.ability, nature: set.nature,
                            moves: set.moves.filter(m => m && m.trim()), setId: set.set_id,
@@ -1232,7 +1273,7 @@ function resolveTeam() {
         });
     }
     const t = currentTowerTeam();
-    return t ? parseShowdown(t.text).slice(0, slotCount()) : [];
+    return t ? parseShowdown(t.text).slice(0, teamCount()) : [];
 }
 
 function teamTitle() {
@@ -1362,7 +1403,8 @@ const fmtNum = n => Number(n || 0).toLocaleString('en-US');
 
 function renderStreak() {
     const box = document.getElementById('streak');
-    const show = showsPart('streak');
+    // The Streak button hides it in the app only; OBS's streak source always shows it
+    const show = showsPart('streak') && (DISPLAY || state.showStreak);
     box.classList.toggle('hidden', !show);
     if (!show) return;
     const r = currentRecord();
@@ -1376,8 +1418,8 @@ function renderStreak() {
     const side = p => p > 85 ? 'left' : p < 15 ? 'right' : 'mid';
     const label = (cls, text, p) => `<span class="sk-mark ${cls}" style="left:${p}%"></span>
         <span class="sk-tag ${cls} ${side(p)}" style="left:${p}%">${text}</span>`;
-    const facility = state.facility === 'factory' ? 'Battle Factory' : 'Battle Tower';
-    const format = `${state.format === 'doubles' ? 'Doubles' : 'Singles'} · Level ${state.level}`;
+    const facility = facilityName();
+    const format = `${formatName()} · Level ${state.level}`;
     // In OBS the panel takes the shape of its Browser Source: a very long, short box gets the wide layout
     // (info on the left, a long bar on the right); anything else keeps the stacked layout, stretched to the
     // box's proportions so it fills it with no gap
@@ -1420,11 +1462,11 @@ function renderStreak() {
 
 function openStreakEditor() {
     const r = currentRecord();
-    const facility = state.facility === 'factory' ? 'Battle Factory' : 'Battle Tower';
+    const facility = facilityName();
     const box = document.getElementById('dialog');
     box.innerHTML = `<div class="dialog-back" id="dlgBack"><div class="dialog" role="dialog" aria-label="Streak" style="width:min(420px,100%)">
         <div class="row"><h2 class="grow">Streak</h2></div>
-        <div class="hint">${facility} · ${state.format === 'doubles' ? 'Doubles' : 'Singles'} · Level ${state.level}. Each facility, format and level keeps its own numbers.</div>
+        <div class="hint">${facility} · ${formatName()} · Level ${state.level}. Each facility, format and level keeps its own numbers.</div>
         ${[['skStreak', 'Current streak', r.streak], ['skPb', 'Personal best (PB)', r.pb], ['skWr', 'World record (WR)', r.wr]].map(([id, label, v]) => `
             <label class="row" for="${id}"><span class="grow">${label}</span>
             <input type="text" inputmode="numeric" id="${id}" value="${v || 0}" style="width:120px;text-align:right"></label>`).join('')}
@@ -1475,7 +1517,7 @@ function openTeamEditor(teamId) {
                     <textarea id="teamText" spellcheck="false" placeholder="${esc(TEAM_EXAMPLE)}">${esc(current.text)}</textarea>
                     <div class="hint">Paste the team from Showdown (Export) or type it in the same format: one Pokémon per block, a blank line between them.
                         ${parsed.length ? `Read ${parsed.length}: ${parsed.map(m => esc(m.species)).join(', ')}.` : ''}
-                        The overlay shows the first ${slotCount()} in ${state.format}.</div>
+                        The overlay shows the first ${teamCount()} in ${formatName()}.</div>
                     ${unknown.length ? `<div class="warn">Not a Pokémon name: ${unknown.map(esc).join(', ')}</div>` : ''}
                     ${badMoves.length ? `<div class="warn">Not a move name: ${badMoves.map(esc).join(', ')}</div>` : ''}
                     <div class="row"><button class="btn primary" id="useTeam">Use this team</button><span class="grow"></span><button class="btn danger" id="delTeam">Delete team</button></div>
@@ -1622,7 +1664,7 @@ function wireTheme() {
 // OBS: the app keeps a copy of what's on screen on a small local web page
 // (http://127.0.0.1:7373/?view=display) that OBS shows as a Browser Source.
 // ============================================================
-const MIRROR_KEYS = ['facility', 'format', 'trainerId', 'level', 'round', 'picks', 'theme', 'showTeam'];
+const MIRROR_KEYS = ['facility', 'format', 'trainerId', 'trainerId2', 'level', 'round', 'picks', 'theme', 'showTeam'];
 
 function broadcast() {
     if (!TAURI) return;
@@ -1703,8 +1745,7 @@ const auto = { file: null, offset: 0, inBattle: false, timer: null, status: '', 
 // Log name ("Gulpin", "Nidoran♀") -> the name the set data uses
 function dataSpecies(name) {
     const n = norm(name);
-    const t = state.facility === 'tower' ? currentTrainer() : null;
-    const pool = t ? t.pokemon_pool.map(e => e.pokemon) : [];
+    const pool = usesTrainers() ? currentTrainers().flatMap(t => t.pokemon_pool).map(e => e.pokemon) : [];
     for (const sp of [...pool, ...setsBySpecies.keys()]) if (norm(sp) === n) return sp;
     return name;
 }
@@ -1726,19 +1767,24 @@ function applyBattleEvents(events, replay) {
     for (const e of events) {
         if (['mySentOut', 'boost', 'clearBoosts'].includes(e.type)) { calcFollow(e); changed = true; continue; }
         if (e.type === 'challenge') {
-            auto.battle = { index: e.index, trainer: e.trainer, started: false };
-            if (state.facility === 'tower') {
-                const t = trainers.find(x => trainerNo(x) === e.index);
-                if (t) state.trainerId = t.id;
+            const opp = e.trainers || [{ name: e.trainer, index: e.index }];
+            auto.battle = { index: e.index, trainer: opp.map(o => o.name).join(' & '), indexes: opp.map(o => o.index), started: false };
+            if (usesTrainers()) {
+                const ts = opp.map(o => trainers.find(x => trainerNo(x) === o.index)).filter(Boolean);
+                if (ts[0]) { state.trainerId = ts[0].id; state.trainerId2 = ts[1] ? ts[1].id : null; }
+                // Two trainers at once is Multi or Co-op (which one only you know: keep it if it's already set)
+                if (opp.length > 1 && !isPair()) state.format = state.facility === 'tower' ? 'multi' : 'doubles';
             }
             state.picks = [];
             result = null;
             changed = true;
         } else if (e.type === 'foeSentOut') {
+            // Only the trainers who challenged you (in Multi your NPC partner also "sends out")
+            if (auto.battle && auto.battle.indexes && !auto.battle.indexes.includes(e.index)) continue;
             if (auto.battle && !auto.battle.started) {
                 // The first send-out shows the format: two Pokémon at once is doubles
                 auto.battle.started = true;
-                state.format = e.species.length > 1 ? 'doubles' : 'singles';
+                if (!isPair()) state.format = e.species.length > 1 ? 'doubles' : 'singles';
             }
             for (const name of e.species) {
                 const species = dataSpecies(name);
@@ -1944,7 +1990,7 @@ function calcField(attackerSide) {
     const c = state.calc, sides = c.sides || {};
     const other = attackerSide === 'mine' ? 'foe' : 'mine';
     return new window.Calc.Field({
-        gameType: state.format === 'doubles' ? 'Doubles' : 'Singles',
+        gameType: isDoubles() ? 'Doubles' : 'Singles',
         weather: c.weather || undefined,
         isGravity: !!c.gravity,
         attackerSide: { ...(sides[attackerSide] || {}) },
@@ -2097,7 +2143,7 @@ function calcEditor(side, s, mon, spe, header) {
         return `<div class="cc-mv"><input type="text" list="ccMoves" data-move="${side}.${i}" value="${esc(m)}" placeholder="${side === 'foe' ? 'Unscouted' : 'Move'}" spellcheck="false">
             ${hits}<label title="Critical hit"><input type="checkbox" data-crit="${side}.${i}"${s.crits[i] ? ' checked' : ''}>Crit</label></div>`;
     }).join('');
-    const sideFlags = SIDE_FLAGS.filter(([, , dbl]) => !dbl || state.format === 'doubles').map(([k, l]) =>
+    const sideFlags = SIDE_FLAGS.filter(([, , dbl]) => !dbl || isDoubles()).map(([k, l]) =>
         `<label><input type="checkbox" data-sflag="${side}.${k}"${((c.sides || {})[side] || {})[k] ? ' checked' : ''}>${l}</label>`).join('');
     const spikes = ((c.sides || {})[side] || {}).spikes || 0;
     return `<div class="cc-ed">
@@ -2153,7 +2199,7 @@ function renderCalc() {
         <div class="cc-title"><span>Damage calc</span><span class="grow"></span>
             <select data-cfield="weather">${weathers}</select>
             <label><input type="checkbox" data-cfield="gravity"${c.gravity ? ' checked' : ''}> Gravity</label>
-            <span class="dim">${state.format === 'doubles' ? 'Doubles' : 'Singles'} · Lv ${state.level}</span></div>
+            <span class="dim">${formatName()} · Lv ${state.level}</span></div>
         <div class="cc-results">${calcResults(v)}</div>
         ${v && v.notes && v.notes.length ? `<div class="cc-notes">${v.notes.map(esc).join(' · ')}</div>` : ''}
         ${editors}
