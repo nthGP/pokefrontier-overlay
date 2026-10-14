@@ -10,6 +10,10 @@
 //   { type: 'foeMove', species: 'Gulpin', move: 'Water Pulse' }
 //   { type: 'foeItem', species: 'Crobat', item: 'Life Orb' }   (any "The foe's X ... its ITEM!" message)
 //   { type: 'won', index: 66 } / { type: 'lost', index: 42 }
+//   { type: 'mySentOut', names: ['Skarmory'] }    (your side; names can be nicknames)
+//   { type: 'boost', foe: false, name: 'Skarmory', stats: ['atk', 'def'], by: 1 }
+//   { type: 'boost', foe: true, name: 'Marowak', stats: ['atk'], set: 6 }   (Belly Drum)
+//   { type: 'clearBoosts' }   (Haze)
 (function (root) {
     const STAMP = /^\[\d{1,2}\/\d{1,2}\/\d{2,4} \d{1,2}:\d{2}:\d{2}\] \[Battle\] ?/;
 
@@ -28,6 +32,11 @@
         return out.map(clean).filter(Boolean);
     }
 
+    const STAT = { 'attack': 'atk', 'defense': 'def', 'sp. atk': 'spa', 'special attack': 'spa', 'sp. def': 'spd',
+                   'special defense': 'spd', 'speed': 'spe' };
+    const AMOUNT = { 'rose': 1, 'sharply rose': 2, 'rose sharply': 2, 'rose drastically': 3, 'drastically rose': 3,
+                     'fell': -1, 'harshly fell': -2, 'fell harshly': -2, 'severely fell': -3, 'fell severely': -3 };
+
     function parse(lines) {
         const events = [];
         for (const m of messages(lines)) {
@@ -40,6 +49,15 @@
                 events.push({ type: 'won', index: +r[2] });
             } else if ((r = m.match(/^(.+?)\[(\d+)\] sent out (.+)!$/))) {
                 events.push({ type: 'foeSentOut', index: +r[2], species: r[3].split(' and ').map(monName).filter(Boolean) });
+            } else if ((r = m.match(/^Go! (.+)!$/)) || (r = m.match(/^[^\[]+? sent out (.+)!$/))) {
+                events.push({ type: 'mySentOut', names: r[1].split(' and ').map(monName).filter(Boolean) });
+            } else if (m === 'All stat changes were eliminated!') {
+                events.push({ type: 'clearBoosts' });
+            } else if ((r = m.match(/^(The foe's )?(.+?) cut its own HP and maximized its Attack!$/))) {
+                events.push({ type: 'boost', foe: !!r[1], name: monName(r[2]), stats: ['atk'], set: 6 });
+            } else if ((r = m.match(/^(The foe's )?(.+?)'s ((?:Attack|Defense|Sp\. Atk|Sp\. Def|Speed|Special Attack|Special Defense)(?:(?:, | and )(?:Attack|Defense|Sp\. Atk|Sp\. Def|Speed|Special Attack|Special Defense))*) ((?:sharply |harshly |severely |drastically )?(?:rose|fell)(?: sharply| harshly| severely| drastically)?)!$/))) {
+                const stats = r[3].split(/, | and /).map(x => STAT[x.toLowerCase()]).filter(Boolean);
+                if (stats.length && AMOUNT[r[4]]) events.push({ type: 'boost', foe: !!r[1], name: monName(r[2]), stats, by: AMOUNT[r[4]] });
             } else if ((r = m.match(/^The foe's (.+?) used (.+?)!(?: \(.*\))?$/))) {
                 events.push({ type: 'foeMove', species: monName(r[1]), move: clean(r[2]) });
             } else if ((r = m.match(/^The foe's (.+?) (?:is|was|restored|ate|used|consumed|held|became).* its (.+?)!$/))) {
