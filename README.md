@@ -32,6 +32,17 @@ When a new version is out, an **Update** button appears in the top bar.
 - **Click a set** to lock it in once you know which one it is.
 - **Esc** or **Clear** starts the next battle.
 
+**Auto mode** (fills everything in for you)
+1. In PokeMMO, turn on the option to log chat to disk.
+2. In the app, click **Auto**, tick **Follow the chat log**. The log folder is found by itself (normally
+   `C:\Program Files\PokeMMO\log`); if not, paste the game's `log` folder and press Enter.
+3. Play. When a trainer challenges you the app picks them (by their Tower number) and sets Singles or Doubles; each
+   Pokémon they send out is added and the moves they use are marked. Wins and losses go on the streak bar (untick
+   **Count wins and losses on the streak** to do that by hand).
+- Only battle messages are read. Team, whisper and global chat are skipped inside the app and never shown, saved or sent.
+- Tower and Factory still come from the switch at the top: the log doesn't say which facility you're in.
+- Everything stays clickable, so you can still fix anything by hand.
+
 **Your team** (bottom of the overlay; **Team** in the bar hides it)
 - **Tower:** click **Add a team** / **Edit teams**, give it a name and paste the team from Showdown (Export), or type it
   in the same format. Save as many teams as you like and pick one from the dropdown. Singles shows the first 3, doubles the first 4.
@@ -76,6 +87,8 @@ engine built into Windows and shows `src/index.html`. All the features are in th
 - **Data:** on every start the page downloads `trainers.json`, `sets.json` and `dex.json` from the site and saves a copy,
   so it keeps working offline. A snapshot is also bundled into each build for a first offline start.
   Set *contents* change on the site nightly; the app never needs a new version for data changes.
+- **Auto mode:** `src-tauri/src/chatlog.rs` reads the newest `chat_*.log` from where it left off and passes on only
+  `[Battle]` lines; `src/battlelog.js` turns them into events (challenge, sent out, foe move, won, lost).
 - **OBS:** the app runs a tiny web server on `127.0.0.1` only (`src-tauri/src/obs.rs`, ports 7373–7377) that serves
   the same page with `?view=display`. The app window sends its state there after every change; the OBS page polls it.
 - **Building:** the [Build workflow](.github/workflows/build.yml) builds the installer on GitHub for every push and
