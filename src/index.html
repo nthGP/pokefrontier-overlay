@@ -76,6 +76,9 @@
         }
         .icon-btn:hover { color: var(--ink); border-color: var(--faint); }
         .icon-btn.on { color: var(--accent); border-color: var(--accent); }
+        .icon-btn.err { color: var(--warn); border-color: var(--warn); }
+        .auto-status { font-size: 12.5px; color: var(--muted); background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 10px; }
+        .auto-status.err { color: var(--warn); }
         .icon-btn svg { width: 14px; height: 14px; }
 
         .search { position: relative; }
@@ -371,6 +374,7 @@
         <button class="icon-btn update hidden" id="updateBtn" title="A newer version is available">Update</button>
         <button class="icon-btn" id="clearBtn" title="Clear the picked Pokémon (Esc)">Clear</button>
         <button class="icon-btn" id="pickerBtn" title="Show or hide the Pokémon picker">Picker</button>
+        <button class="icon-btn hidden" id="autoBtn" title="Auto mode: follow the game's chat log">Auto</button>
         <button class="icon-btn" id="teamBtn" title="Show or hide your team at the bottom">Team</button>
         <button class="icon-btn" id="themeBtn" title="Colours">Theme</button>
         <button class="icon-btn hidden" id="obsBtn" title="Copy the address for an OBS Browser Source">OBS</button>
@@ -411,6 +415,7 @@
     <div class="foot" id="foot"></div>
 </div>
 
+<script src="battlelog.js"></script>
 <script>
 // ============================================================
 // Setup
@@ -519,6 +524,7 @@ const DEFAULT_STATE = {
     towerTeamId: null,
     factoryTeam: [],       // rentals: [{ species, set_id }]
     records: {},           // streaks: { "tower|singles|50": { streak, pb, wr } }
+    auto: { on: false, dir: '', streak: true },   // auto mode: follow the game's chat log
     theme: { ...DEFAULT_THEME },
 };
 let state = loadState();
@@ -526,7 +532,7 @@ let state = loadState();
 function loadState() {
     try {
         const saved = JSON.parse(localStorage.getItem('overlayState') || 'null');
-        if (saved) return { ...DEFAULT_STATE, ...saved };
+        if (saved) return { ...DEFAULT_STATE, ...saved, auto: { ...DEFAULT_STATE.auto, ...(saved.auto || {}) } };
     } catch (e) {}
     return { ...DEFAULT_STATE };
 }
@@ -604,6 +610,7 @@ async function init() {
     renderFoot();
     checkForUpdate();
     broadcast();
+    startAuto();
 }
 
 // ============================================================
@@ -1570,6 +1577,164 @@ function applyChrome() {
         openObsDialog(url);
     };
     document.getElementById('closeBtn').onclick = () => appWindow.close();
+}
+
+// ============================================================
+// Auto mode: the app follows PokeMMO's chat log and fills in the opponent by itself.
+// The Rust side (chatlog.rs) only passes on [Battle] lines; battlelog.js turns them into events.
+// ============================================================
+const auto = { file: null, offset: 0, inBattle: false, timer: null, status: '', error: false, battle: null, busy: false };
+
+// Log name ("Gulpin", "Nidoran♀") -> the name the set data uses
+function dataSpecies(name) {
+    const n = norm(name);
+    const t = state.facility === 'tower' ? currentTrainer() : null;
+    const pool = t ? t.pokemon_pool.map(e => e.pokemon) : [];
+    for (const sp of [...pool, ...setsBySpecies.keys(), ...Object.keys(dex.species || {})]) if (norm(sp) === n) return sp;
+    return name;
+}
+
+function autoStatus(text, error = false) {
+    auto.status = text; auto.error = error;
+    const btn = document.getElementById('autoBtn');
+    btn.classList.toggle('on', state.auto.on && !error);
+    btn.classList.toggle('err', state.auto.on && error);
+    btn.title = state.auto.on ? `Auto mode: ${text}` : "Auto mode: follow the game's chat log";
+    const box = document.getElementById('autoStatus');
+    if (box) { box.textContent = text; box.classList.toggle('err', error); }
+}
+
+// Applies log events to the overlay. replay: catching up on a battle already under way when auto mode
+// started, so wins and losses from before aren't counted again.
+function applyBattleEvents(events, replay) {
+    let changed = false, result = null;
+    for (const e of events) {
+        if (e.type === 'challenge') {
+            auto.battle = { index: e.index, trainer: e.trainer, started: false };
+            if (state.facility === 'tower') {
+                const t = trainers.find(x => trainerNo(x) === e.index);
+                if (t) state.trainerId = t.id;
+            }
+            state.picks = [];
+            result = null;
+            changed = true;
+        } else if (e.type === 'foeSentOut') {
+            if (auto.battle && !auto.battle.started) {
+                // The first send-out shows the format: two Pokémon at once is doubles
+                auto.battle.started = true;
+                state.format = e.species.length > 1 ? 'doubles' : 'singles';
+            }
+            for (const name of e.species) {
+                const species = dataSpecies(name);
+                if (state.picks.some(p => p.species === species)) continue;
+                if (state.picks.length >= slotCount()) state.picks.shift();
+                state.picks.push({ species, locked: null, revealed: [] });
+            }
+            changed = true;
+        } else if (e.type === 'foeMove') {
+            if (/^struggle$/i.test(e.move)) continue;
+            const pick = state.picks.find(p => norm(p.species) === norm(e.species));
+            if (pick && !pick.revealed.some(m => norm(m) === norm(e.move))) { pick.revealed.push(e.move); changed = true; }
+        } else if (e.type === 'won' || e.type === 'lost') {
+            if (auto.battle) result = e.type;
+            auto.battle = null;
+        }
+    }
+    if (result && !replay && state.auto.streak) {
+        const r = currentRecord();
+        setRecord({ streak: result === 'won' ? r.streak + 1 : 0 });   // commits too
+        return result;
+    }
+    if (changed) commit();
+    return result;
+}
+
+async function pollAuto() {
+    if (!state.auto.on || auto.busy) return;
+    auto.busy = true;
+    try {
+        const first = auto.file === null;
+        let lines = [], chunk;
+        do {
+            chunk = await TAURI.core.invoke('read_chat_log', { dir: state.auto.dir, file: auto.file, offset: auto.offset, inBattle: auto.inBattle });
+            auto.file = chunk.file; auto.offset = chunk.offset; auto.inBattle = chunk.in_battle;
+            lines = lines.concat(chunk.lines);
+        } while (chunk.more);
+        let events = BattleLog.parse(lines);
+        if (first) {
+            // Starting up: only the latest battle matters, and nothing from it is counted on the streak
+            const last = events.map(e => e.type).lastIndexOf('challenge');
+            events = last >= 0 ? events.slice(last) : [];
+            applyBattleEvents(events, true);
+        } else if (events.length) {
+            const result = applyBattleEvents(events, false);
+            if (result) auto.lastResult = result;
+        }
+        const b = auto.battle;
+        autoStatus(`Following ${auto.file}` + (b ? ` · battling ${b.trainer} #${b.index}` : ' · waiting for a battle'));
+    } catch (e) {
+        auto.file = null; auto.offset = 0;   // start over (and catch up) once the log is back
+        const msg = String(e && e.message || e);
+        autoStatus(msg.includes('folder not found') ? "Can't find that log folder" :
+                   msg.includes('no chat log') ? 'No chat log in that folder yet. Is "log chat to disk" on in the game?' :
+                   "Couldn't read the chat log: " + msg, true);
+    } finally {
+        auto.busy = false;
+    }
+}
+
+async function startAuto() {
+    if (!TAURI) return;
+    document.getElementById('autoBtn').classList.remove('hidden');
+    document.getElementById('autoBtn').onclick = openAutoDialog;
+    if (!state.auto.dir) {
+        const guess = await TAURI.core.invoke('guess_chat_log_dir').catch(() => null);
+        state.auto = { ...state.auto, dir: guess || 'C:\\Program Files\\PokeMMO\\log' };
+        commit();
+    }
+    restartAuto();
+}
+
+function restartAuto() {
+    clearInterval(auto.timer);
+    auto.file = null; auto.offset = 0; auto.inBattle = false; auto.battle = null;
+    if (!state.auto.on) { autoStatus('Off'); return; }
+    autoStatus('Starting…');
+    pollAuto();
+    auto.timer = setInterval(pollAuto, 700);
+}
+
+function openAutoDialog() {
+    const a = state.auto;
+    document.getElementById('dialog').innerHTML = `<div class="dialog-back" id="dlgBack"><div class="dialog" role="dialog" aria-label="Auto mode" style="width:min(520px,100%)">
+        <div class="row"><h2 class="grow">Auto mode</h2><button class="btn" id="dlgClose">Done</button></div>
+        <div class="hint">Reads the game's chat log as you play: picks the trainer when they challenge you, adds each Pokémon they send out,
+            marks the moves they use, and sets Singles/Doubles. Turn on the game's option to log chat to disk first.</div>
+        <label class="row"><input type="checkbox" id="autoOn"${a.on ? ' checked' : ''}><span class="grow">Follow the chat log</span></label>
+        <label style="display:grid;gap:4px"><span>Log folder</span>
+            <span class="row"><input type="text" id="autoDir" class="grow" value="${esc(a.dir)}" spellcheck="false"><button class="btn" id="autoFind">Find</button></span></label>
+        <label class="row"><input type="checkbox" id="autoStreak"${a.streak ? ' checked' : ''}><span class="grow">Count wins and losses on the streak</span></label>
+        <div class="auto-status" id="autoStatus"></div>
+        <div class="hint">Only battle messages are read. Team, whisper and global chat are skipped by the app and never shown, saved or sent anywhere.</div>
+    </div></div>`;
+    autoStatus(auto.status, auto.error);
+    const back = document.getElementById('dlgBack');
+    back.addEventListener('mousedown', e => { if (e.target === back) closeDialog(); });
+    document.getElementById('dlgClose').onclick = closeDialog;
+    const save = restart => {
+        state.auto = { on: document.getElementById('autoOn').checked, dir: document.getElementById('autoDir').value.trim(),
+                       streak: document.getElementById('autoStreak').checked };
+        commit();
+        if (restart) restartAuto();
+    };
+    document.getElementById('autoOn').onchange = () => save(true);
+    document.getElementById('autoDir').onchange = () => save(true);
+    document.getElementById('autoStreak').onchange = () => save(false);
+    document.getElementById('autoFind').onclick = async () => {
+        const guess = await TAURI.core.invoke('guess_chat_log_dir').catch(() => null);
+        if (guess) { document.getElementById('autoDir').value = guess; save(true); }
+        else autoStatus("Couldn't find PokeMMO's log folder. Paste its address (it's the 'log' folder inside the game's folder).", true);
+    };
 }
 
 // Compare "1.2.10" style versions

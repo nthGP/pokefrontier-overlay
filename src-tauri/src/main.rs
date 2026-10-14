@@ -4,6 +4,7 @@
 // No console window behind the app on Windows (release builds)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod chatlog;
 mod obs;
 
 use std::sync::Arc;
@@ -51,7 +52,12 @@ fn main() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![obs::set_overlay_state, obs::obs_url])
+        .invoke_handler(tauri::generate_handler![
+            obs::set_overlay_state,
+            obs::obs_url,
+            chatlog::read_chat_log,
+            chatlog::guess_chat_log_dir
+        ])
         .setup(|app| {
             // Local page for OBS (see obs.rs)
             let mirror = Arc::new(obs::Mirror::default());
