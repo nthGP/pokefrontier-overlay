@@ -525,7 +525,11 @@ const appWindow = TAURI ? TAURI.window.getCurrentWindow() : null;
 
 // The site is the single source of data. Each successful download is cached, so the app
 // still works offline; data/ holds a snapshot bundled at build time for a first offline start.
-const SITE_DATA = 'https://pokefrontier.egpr.cloud/data/';
+// Two addresses for the same Cloudflare site: Spanish ISPs block some Cloudflare IPs during LaLiga
+// matches, which takes egpr.cloud down while workers.dev (different IPs) keeps working. Both are tried
+// at once and the first good answer wins.
+const SITE_HOSTS = ['pokefrontier.egpr.cloud', 'pokefrontier.garcia-eduard64.workers.dev'];
+let liveHost = null;   // which address the last live download came from
 const RELEASES_API = 'https://api.github.com/repos/nthGP/pokefrontier-overlay/releases/latest';
 // Gen 1-4 Pokémon use Diamond/Pearl sprites; Gen 5 ones (id > 493) use Black/White
 const SPRITE = id => `https://veekun.com/dex/media/pokemon/main-sprites/${id > 493 ? 'black-white' : 'diamond-pearl'}/${id}.png`;
@@ -668,12 +672,14 @@ async function fetchWithTimeout(url, ms) {
 
 async function loadJSON(name) {
     try {
-        const data = await fetchWithTimeout(SITE_DATA + name, 8000);
+        const [host, data] = await Promise.any(SITE_HOSTS.map(host =>
+            fetchWithTimeout(`https://${host}/data/${name}`, 8000).then(d => [host, d])));
+        liveHost = host;
         try { localStorage.setItem('cache:' + name, JSON.stringify({ at: new Date().toISOString(), data })); } catch (e) {}
         dataStatus[name] = 'live';
         return data;
     } catch (e) {
-        console.warn(`Couldn't download ${name}:`, e.message);
+        console.warn(`Couldn't download ${name} from any address:`, (e.errors || [e]).map(x => x.message).join('; '));
     }
     try {
         const cached = JSON.parse(localStorage.getItem('cache:' + name) || 'null');
@@ -1701,7 +1707,7 @@ async function pollMirror() {
 function renderFoot() {
     const st = dataStatus['sets.json'];
     let text;
-    if (st === 'live') text = 'Data: live from pokefrontier.egpr.cloud';
+    if (st === 'live') text = `Data: live from ${liveHost || SITE_HOSTS[0]}`;
     else if (st === 'bundled') text = '<span class="warn">Offline: using the data bundled with the app</span>';
     else if (st) text = `<span class="warn">Offline: using data saved ${new Date(st).toLocaleString()}</span>`;
     else text = '';
