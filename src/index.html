@@ -527,9 +527,8 @@ const appWindow = TAURI ? TAURI.window.getCurrentWindow() : null;
 // still works offline; data/ holds a snapshot bundled at build time for a first offline start.
 // Two addresses for the same Cloudflare site: Spanish ISPs block some Cloudflare IPs during LaLiga
 // matches, which takes egpr.cloud down while workers.dev (different IPs) keeps working. Both are tried
-// at once and the first good answer wins.
+// at once and the first good answer wins. The footer doesn't say which one answered.
 const SITE_HOSTS = ['pokefrontier.egpr.cloud', 'pokefrontier.garcia-eduard64.workers.dev'];
-let liveHost = null;   // which address the last live download came from
 const RELEASES_API = 'https://api.github.com/repos/nthGP/pokefrontier-overlay/releases/latest';
 // Gen 1-4 Pokémon use Diamond/Pearl sprites; Gen 5 ones (id > 493) use Black/White
 const SPRITE = id => `https://veekun.com/dex/media/pokemon/main-sprites/${id > 493 ? 'black-white' : 'diamond-pearl'}/${id}.png`;
@@ -672,9 +671,7 @@ async function fetchWithTimeout(url, ms) {
 
 async function loadJSON(name) {
     try {
-        const [host, data] = await Promise.any(SITE_HOSTS.map(host =>
-            fetchWithTimeout(`https://${host}/data/${name}`, 8000).then(d => [host, d])));
-        liveHost = host;
+        const data = await Promise.any(SITE_HOSTS.map(host => fetchWithTimeout(`https://${host}/data/${name}`, 8000)));
         try { localStorage.setItem('cache:' + name, JSON.stringify({ at: new Date().toISOString(), data })); } catch (e) {}
         dataStatus[name] = 'live';
         return data;
@@ -1707,7 +1704,7 @@ async function pollMirror() {
 function renderFoot() {
     const st = dataStatus['sets.json'];
     let text;
-    if (st === 'live') text = `Data: live from ${liveHost || SITE_HOSTS[0]}`;
+    if (st === 'live') text = 'Data: live';
     else if (st === 'bundled') text = '<span class="warn">Offline: using the data bundled with the app</span>';
     else if (st) text = `<span class="warn">Offline: using data saved ${new Date(st).toLocaleString()}</span>`;
     else text = '';
@@ -1923,6 +1920,10 @@ const CALC_ITEM_FIX = { 'leek': 'Stick', 'notlum': null, 'assaultgear': 'Assault
 const CALC_MOVE_FIX = { 'faintattack': 'Feint Attack' };
 const STATS6 = [['hp', 'HP'], ['atk', 'Atk'], ['def', 'Def'], ['spa', 'SpA'], ['spd', 'SpD'], ['spe', 'Spe']];
 const STATUSES = [['', 'Healthy'], ['brn', 'Burned'], ['par', 'Paralyzed'], ['psn', 'Poisoned'], ['tox', 'Badly poisoned'], ['slp', 'Asleep'], ['frz', 'Frozen']];
+// Held items that give their holder a status at the end of its first turn: the calc starts with it
+const ORB_STATUS = { toxicorb: 'tox', flameorb: 'brn' };
+// Abilities that set the weather when their holder comes in (permanent in Gen 5)
+const WEATHER_ABILITIES = { drought: 'Sun', drizzle: 'Rain', sandstream: 'Sand', snowwarning: 'Hail' };
 const SIDE_FLAGS = [['isReflect', 'Reflect'], ['isLightScreen', 'Light Screen'], ['isSR', 'Stealth Rock'],
                     ['isHelpingHand', 'Helping Hand', true], ['isFriendGuard', 'Friend Guard', true], ['isTailwind', 'Tailwind'], ['isProtected', 'Protect']];
 const cid = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -1961,7 +1962,9 @@ function calcSource(side, src) {
         nature: e.nature !== undefined ? e.nature : src.nature,
         item: e.item !== undefined ? e.item : src.item,
         ability: e.ability !== undefined ? e.ability : src.ability,
-        status: e.status || '',
+        // A status you picked wins; otherwise Toxic/Flame Orb holders start poisoned/burned
+        status: e.status !== undefined ? e.status
+              : ORB_STATUS[cid(e.item !== undefined ? e.item : src.item)] || '',
         evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...(src.evs || {}), ...(e.evs || {}) },
         ivs: { ...ivs, ...(e.ivs || {}) },
         moves, hits: e.hits || [], crits: e.crits || [],
@@ -1992,12 +1995,33 @@ function calcPokemon(s, side, notes, label, foe) {
     return mon;
 }
 
+// Weather for the current matchup. A weather ability on either Pokémon sets it (the one that came in
+// last wins if both have one). A weather you pick by hand stays only while the same two Pokémon are
+// in the calc, so switching either one goes back to what their abilities say.
+const pairKey = s => s.mine && s.foeSet ? `${editKey('mine', s.mine)}|${editKey('foe', s.foeSet)}` : '';
+function autoWeather(s) {
+    const from = side => {
+        const src = side === 'mine' ? s.mine : s.foeSet;
+        const ability = src ? calcSource(side, src).ability : null;
+        const w = WEATHER_ABILITIES[cid(ability)];
+        return w ? { weather: w, ability } : null;
+    };
+    const order = state.calc.lastIn === 'mine' ? ['foe', 'mine'] : ['mine', 'foe'];   // later one wins
+    return from(order[1]) || from(order[0]);
+}
+function calcWeather(s = calcSides()) {
+    const c = state.calc;
+    if (c.weatherFor && c.weatherFor === pairKey(s)) return { weather: c.weather || '', manual: true };
+    const a = autoWeather(s);
+    return a ? { weather: a.weather, ability: a.ability } : { weather: '' };
+}
+
 function calcField(attackerSide) {
     const c = state.calc, sides = c.sides || {};
     const other = attackerSide === 'mine' ? 'foe' : 'mine';
     return new window.Calc.Field({
         gameType: isDoubles() ? 'Doubles' : 'Singles',
-        weather: c.weather || undefined,
+        weather: calcWeather().weather || undefined,
         isGravity: !!c.gravity,
         attackerSide: { ...(sides[attackerSide] || {}) },
         defenderSide: { ...(sides[other] || {}) },
@@ -2196,7 +2220,8 @@ function renderCalc() {
     const headMine = `<b>Yours</b>${sides.team.length ? `<select data-cfield="mine">${mineOpts}</select>` : '<span class="dim">No team yet</span>'}`;
     const headFoe = `<b>Theirs</b>${state.picks.length ? `<select data-cfield="foe">${foeOpts}</select>` : '<span class="dim">No Pokémon picked</span>'}
         ${sides.options.length > 1 ? `<select data-cfield="foeSet">${setOpts}</select>` : ''}`;
-    const weathers = ['', 'Sun', 'Rain', 'Sand', 'Hail'].map(w => `<option value="${w}"${w === (c.weather || '') ? ' selected' : ''}>${w || 'No weather'}</option>`).join('');
+    const wx = calcWeather(sides);
+    const weathers = ['', 'Sun', 'Rain', 'Sand', 'Hail'].map(w => `<option value="${w}"${w === wx.weather ? ' selected' : ''}>${w || 'No weather'}${w && w === wx.weather && wx.ability ? ` (${esc(wx.ability)})` : ''}</option>`).join('');
     const editors = run.A
         ? `<div class="cc-eds">${calcEditor('mine', run.sm, run.A, run.speA, headMine)}${calcEditor('foe', run.sf, run.B, run.speB, headFoe)}</div>`
         : `<div class="cc-eds"><div class="cc-ed"><div class="cc-ed-head">${headMine}</div></div><div class="cc-ed"><div class="cc-ed-head">${headFoe}</div></div></div>`;
@@ -2262,10 +2287,10 @@ function wireCalc() {
         if (d.sflag) { const [side, k] = d.sflag.split('.'); const sd = c().sides || {}; return set({ sides: { ...sd, [side]: { ...(sd[side] || {}), [k]: t.checked } } }); }
         if (d.spikes) { const sd = c().sides || {}; return set({ sides: { ...sd, [d.spikes]: { ...(sd[d.spikes] || {}), spikes: +t.value } } }); }
         const f = d.cfield;
-        if (f === 'mine') return set({ mine: +t.value, boosts: { ...c().boosts, mine: {} }, hp: { ...c().hp, mine: 100 }, sel: null });
-        if (f === 'foe') return set({ foe: +t.value, boosts: { ...c().boosts, foe: {} }, hp: { ...c().hp, foe: 100 }, sel: null });
+        if (f === 'mine') return set({ mine: +t.value, lastIn: 'mine', boosts: { ...c().boosts, mine: {} }, hp: { ...c().hp, mine: 100 }, sel: null });
+        if (f === 'foe') return set({ foe: +t.value, lastIn: 'foe', boosts: { ...c().boosts, foe: {} }, hp: { ...c().hp, foe: 100 }, sel: null });
         if (f === 'foeSet') { const pick = state.picks[c().foe] || state.picks[0]; return set({ foeSets: { ...(c().foeSets || {}), [pick.species]: +t.value }, sel: null }); }
-        if (f === 'weather') return set({ weather: t.value });
+        if (f === 'weather') return set({ weather: t.value, weatherFor: pairKey(calcSides()) });
         if (f === 'gravity') return set({ gravity: t.checked });
     });
 }
@@ -2275,14 +2300,14 @@ function calcPickFoe(slot, setId) {
     const pick = state.picks[slot];
     if (!pick) return;
     const same = state.calc.foe === slot;
-    state.calc = { ...state.calc, foe: slot, foeSets: { ...(state.calc.foeSets || {}), [pick.species]: setId },
+    state.calc = { ...state.calc, foe: slot, ...(same ? {} : { lastIn: 'foe' }), foeSets: { ...(state.calc.foeSets || {}), [pick.species]: setId },
                    ...(same ? {} : { boosts: { ...state.calc.boosts, foe: {} }, hp: { ...state.calc.hp, foe: 100 } }), sel: null, };
     state.showCalc = true;
     commit();
 }
 function calcPickMine(i) {
     const same = state.calc.mine === i;
-    state.calc = { ...state.calc, mine: i, ...(same ? {} : { boosts: { ...state.calc.boosts, mine: {} }, hp: { ...state.calc.hp, mine: 100 } }), sel: null };
+    state.calc = { ...state.calc, mine: i, ...(same ? {} : { lastIn: 'mine', boosts: { ...state.calc.boosts, mine: {} }, hp: { ...state.calc.hp, mine: 100 } }), sel: null };
     state.showCalc = true;
     commit();
 }
@@ -2292,11 +2317,11 @@ function calcFollow(e) {
     const c = state.calc;
     if (e.type === 'foeSentOut') {
         const i = state.picks.findIndex(p => p.species === dataSpecies(e.species[0]));
-        if (i >= 0) state.calc = { ...c, foe: i, boosts: { ...c.boosts, foe: {} }, hp: { ...c.hp, foe: 100 }, sel: null };
+        if (i >= 0) state.calc = { ...c, foe: i, lastIn: 'foe', boosts: { ...c.boosts, foe: {} }, hp: { ...c.hp, foe: 100 }, sel: null };
     } else if (e.type === 'mySentOut') {
         const team = resolveTeam();
         const i = team.findIndex(m => e.names.some(n => norm(n) === norm(m.nickname) || norm(n) === norm(m.species)));
-        if (i >= 0) state.calc = { ...c, mine: i, boosts: { ...c.boosts, mine: {} }, hp: { ...c.hp, mine: 100 }, sel: null };
+        if (i >= 0) state.calc = { ...c, mine: i, lastIn: 'mine', boosts: { ...c.boosts, mine: {} }, hp: { ...c.hp, mine: 100 }, sel: null };
     } else if (e.type === 'clearBoosts') {
         state.calc = { ...c, boosts: { mine: {}, foe: {} } };
     } else if (e.type === 'boost') {
