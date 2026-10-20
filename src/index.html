@@ -1777,6 +1777,37 @@ function dataSpecies(name) {
     return name;
 }
 
+// Some players' logs show the Tower number after a trainer's name ("Collector TRISTAN[066]"), others don't
+// ("Collector TRISTAN"). Without it the trainer is found by class + name (unique across the 300 Tower trainers;
+// the log drops ♀/♂ from classes), or by name alone when only one trainer has it.
+const trainerKey = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[♀♂]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function trainerByLogName(name) {
+    const k = trainerKey(name);
+    const exact = trainers.find(t => trainerKey(t.class + t.name) === k);
+    if (exact) return exact;
+    const last = trainerKey(String(name).trim().split(/\s+/).pop());
+    const byName = trainers.filter(t => trainerKey(t.name) === last);
+    return byName.length === 1 ? byName[0] : null;
+}
+// Fills in what a log without trainer numbers leaves out. Returns null for events to skip.
+function resolveLogEvent(e) {
+    if (e.type === 'challenge' && e.trainers.some(t => t.index == null)) {
+        const opp = e.trainers.map(t => {
+            const tr = t.index != null ? null : trainerByLogName(t.name);
+            return { name: t.name, index: t.index != null ? t.index : tr ? trainerNo(tr) : null };
+        });
+        // A challenger that isn't a Frontier trainer (an overworld battle): leave the overlay alone
+        if (!opp.some(o => o.index != null)) { auto.battle = null; return null; }
+        return { ...e, index: opp[0].index, trainers: opp };
+    }
+    if (e.type === 'sentOut') {
+        const b = auto.battle;
+        const i = b && b.names ? b.names.findIndex(n => trainerKey(n) === trainerKey(e.who)) : -1;
+        return i >= 0 ? { type: 'foeSentOut', index: b.indexes[i], species: e.names } : { type: 'mySentOut', names: e.names };
+    }
+    return e;
+}
+
 // Set inference from the log (BattleLog.tracker). It asks which abilities the shown sets can have.
 function newTracker() {
     return BattleLog.tracker({
@@ -1819,12 +1850,14 @@ function autoStatus(text, error = false) {
 function applyBattleEvents(events, replay) {
     let changed = false, result = null;
     if (!auto.tracker) auto.tracker = newTracker();
-    for (const e of events) {
+    for (const raw of events) {
+        const e = resolveLogEvent(raw);
+        if (!e) continue;
         if (applyFacts(auto.tracker.event(e))) changed = true;
         if (['mySentOut', 'boost', 'clearBoosts'].includes(e.type)) { calcFollow(e); changed = true; continue; }
         if (e.type === 'challenge') {
             const opp = e.trainers || [{ name: e.trainer, index: e.index }];
-            auto.battle = { index: e.index, trainer: opp.map(o => o.name).join(' & '), indexes: opp.map(o => o.index), started: false };
+            auto.battle = { index: e.index, trainer: opp.map(o => o.name).join(' & '), indexes: opp.map(o => o.index), names: opp.map(o => o.name), started: false };
             if (usesTrainers()) {
                 const ts = opp.map(o => trainers.find(x => trainerNo(x) === o.index)).filter(Boolean);
                 if (ts[0]) { state.trainerId = ts[0].id; state.trainerId2 = ts[1] ? ts[1].id : null; }

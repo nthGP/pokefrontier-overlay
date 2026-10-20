@@ -6,6 +6,10 @@
 //
 // Events:
 //   { type: 'challenge', trainer: 'Youngster CONNER', index: 2, trainers: [{ name, index }, ...] }  (2 in Multi/Co-op)
+//       Not every player's log shows the trainer number: "You are challenged by Youngster CONNER!" gives index null
+//       and the app finds the trainer by class and name.
+//   { type: 'sentOut', who: 'Youngster CONNER', names: [...] }   (a send-out without a trainer number: the app decides
+//                                                                 whose it is by comparing "who" with the challenger)
 //   { type: 'foeSentOut', index: 2, species: ['Igglybuff', 'Slugma'] }
 //   { type: 'foeMove', species: 'Gulpin', move: 'Water Pulse' }
 //   { type: 'foeItem', species: 'Crobat', item: 'Life Orb' }   (any "The foe's X ... its ITEM!" message)
@@ -64,14 +68,23 @@
                 // One trainer, or two in Multi / Co-op ("A[012] and B[034]")
                 const trainers = [...r[1].matchAll(/(?:^| and )(.+?)\[(\d+)\]/g)].map(x => ({ name: x[1].trim(), index: +x[2] }));
                 events.push({ type: 'challenge', trainer: trainers[0].name, index: trainers[0].index, trainers });
+            } else if ((r = m.match(/^You are challenged by (.+)!$/))) {
+                const trainers = r[1].split(' and ').map(x => ({ name: x.trim(), index: null }));
+                events.push({ type: 'challenge', trainer: trainers[0].name, index: null, trainers });
             } else if ((r = m.match(/^(.+?)\[(\d+)\] (?:has|have) defeated (.+)!$/))) {
                 events.push({ type: 'lost', index: +r[2] });
             } else if ((r = m.match(/^.+ defeated (.+?)\[(\d+)\]!$/))) {
                 events.push({ type: 'won', index: +r[2] });
+            } else if ((r = m.match(/^(.+?) (?:has|have) defeated (.+)!$/))) {
+                events.push({ type: 'lost', index: null, name: r[1] });
+            } else if ((r = m.match(/^.+? defeated (.+)!$/))) {
+                events.push({ type: 'won', index: null, name: r[1] });
             } else if ((r = m.match(/^(.+?)\[(\d+)\] sent out (.+)!$/))) {
                 events.push({ type: 'foeSentOut', index: +r[2], species: r[3].split(' and ').map(monName).filter(Boolean) });
-            } else if ((r = m.match(/^Go! (.+)!$/)) || (r = m.match(/^[^\[]+? sent out (.+)!$/))) {
+            } else if ((r = m.match(/^Go! (.+)!$/))) {
                 events.push({ type: 'mySentOut', names: r[1].split(' and ').map(monName).filter(Boolean) });
+            } else if ((r = m.match(/^([^\[]+?) sent out (.+)!$/))) {
+                events.push({ type: 'sentOut', who: clean(r[1]), names: r[2].split(' and ').map(monName).filter(Boolean) });
             } else if (m === "Your team's Attack fell!") {
                 // Intimidate: the log doesn't say whose (seen 2026-10-18/19 right after the foe's send-out)
                 events.push({ type: 'foeAbility', species: null, ability: 'Intimidate' });
@@ -87,6 +100,8 @@
                 events.push({ type: 'turn', n: +r[1] });
             } else if ((r = m.match(/^(.+?)\[(\d+)\] withdrew (.+)!$/))) {
                 events.push({ type: 'foeWithdrew', index: +r[2], species: monName(r[3]) });
+            } else if ((r = m.match(/^([^\[]+?) withdrew (.+)!$/))) {
+                events.push({ type: 'foeWithdrew', index: null, species: monName(r[2]) });    // our own switch reads "X, come back!"
             } else if ((r = m.match(/^The foe's (.+?) fainted!$/))) {
                 events.push({ type: 'foeFainted', species: monName(r[1]) });
             } else if ((r = m.match(/^The foe's (.+?) used (.+?)!(?: \(.*\))?$/))) {
