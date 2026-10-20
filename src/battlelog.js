@@ -33,6 +33,10 @@
     // Player Pokémon can show as "Alpha X" or "☆Shiny X☆"; strip both just in case
     const monName = s => clean(s).replace(/☆/g, '').replace(/^(Alpha|Shiny)\s+/i, '').replace(/^(Alpha|Shiny)\s+/i, '').trim();
 
+    // Some players add their own tags after a trainer's name, e.g. the IV tier: "Pokefan PEYTON[037](9iv)".
+    // Drop a bracketed tag right after the Tower number, and an "(N iv)" tag anywhere it sits glued to a name.
+    const stripTags = m => m.replace(/(\[\d+\])\s*\([^)]*\)/g, '$1').replace(/(\S)\(\d+\s*ivs?\)/gi, '$1');
+
     // Joins wrapped lines back onto their message and drops the timestamp/channel
     function messages(lines) {
         const out = [];
@@ -41,7 +45,7 @@
             if (STAMP.test(line)) out.push(line.replace(STAMP, ''));
             else if (out.length && line.trim()) out[out.length - 1] += ' ' + line.trim();
         }
-        return out.map(clean).filter(Boolean);
+        return out.map(clean).map(stripTags).filter(Boolean);
     }
 
     const STAT = { 'attack': 'atk', 'defense': 'def', 'sp. atk': 'spa', 'special attack': 'spa', 'sp. def': 'spd',

@@ -38,7 +38,7 @@ When a new version is out, an **Update** button appears in the top bar.
 2. In the app, click **Auto**, tick **Follow the chat log**. The log folder is found by itself (normally
    `C:\Program Files\PokeMMO\log`); if not, paste the game's `log` folder and press Enter.
 3. Play. When a trainer challenges you the app picks them (by their Tower number, or by class and name if your log
-   doesn't show the number) and sets Singles or Doubles
+   doesn't show the number; extra tags after the name, like an IV tier `[037](9iv)`, are ignored) and sets Singles or Doubles
    (two trainers at once switches to Multi unless you've set Co-op; your Multi partner's Pokémon are ignored); each
    Pokémon they send out is added and the moves they use are marked. Wins and losses go on the streak bar (untick
    **Count wins and losses on the streak** to do that by hand).
