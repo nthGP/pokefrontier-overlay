@@ -41,6 +41,16 @@ When a new version is out, an **Update** button appears in the top bar.
    (two trainers at once switches to Multi unless you've set Co-op; your Multi partner's Pokémon are ignored); each
    Pokémon they send out is added and the moves they use are marked. Wins and losses go on the streak bar (untick
    **Count wins and losses on the streak** to do that by hand).
+- Auto mode also rules sets out by what the log shows, or doesn't show. A line under the Pokémon's name says what it
+  worked out:
+  - **Abilities:** Intimidate, Pressure and Trace always announce themselves when the Pokémon comes in. If they don't,
+    sets with that ability fade. If one does (or Sand Stream starts a sandstorm), sets with a different ability fade.
+    In doubles, Intimidate doesn't say whose it is, so it's only pinned when just one of the two could have it.
+  - **Choice items:** two different moves without switching out rules out Choice Band, Specs and Scarf.
+    Sleep Talk's called moves, Struggle and Trick are ignored.
+  - **Orbs:** a whole turn on the field with no status rules out Flame Orb and Toxic Orb. If it was already statused
+    (say, you Toxic'd it first), nothing is ruled out. Items seen in the log (Life Orb, Gems, berries, Air Balloon,
+    Focus Sash…) are applied too.
 - Only battle messages are read. Team, whisper and global chat are skipped inside the app and never shown, saved or sent.
 - Tower and Factory still come from the switch at the top: the log doesn't say which facility you're in.
 - Everything stays clickable, so you can still fix anything by hand.
