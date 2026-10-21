@@ -27,11 +27,17 @@
 //                                                                      "Your team's Attack fell!" = Intimidate)
 //   { type: 'itemNoOwner', item: 'Bug Gem' }   ("The Bug Gem strengthened Bug Bite's power!": whoever just moved)
 (function (root) {
-    const STAMP = /^\[\d{1,2}\/\d{1,2}\/\d{2,4} \d{1,2}:\d{2}:\d{2}\] \[Battle\] ?/;
+    // "[21/10/26 22:59:01] [Battle] ..." — the clock follows the player's system settings, so it can also be
+    // 12-hour ("[21/10/26 4:38:45 pm]", "PM", "p. m.") or use another date order/separator. Only the time is required.
+    const STAMP = /^\[[^\]]*?\d{1,2}:\d{2}(?::\d{2})?[^\]]*\] \[Battle\] ?/;
 
     const clean = s => s.replace(/\[#[0-9a-fA-F]*\]/g, '').replace(/\s+/g, ' ').trim();
     // Player Pokémon can show as "Alpha X" or "☆Shiny X☆"; strip both just in case
     const monName = s => clean(s).replace(/☆/g, '').replace(/^(Alpha|Shiny)\s+/i, '').replace(/^(Alpha|Shiny)\s+/i, '').trim();
+
+    // Some players add their own tags after a trainer's name, e.g. the IV tier: "Pokefan PEYTON[037](9iv)".
+    // Drop a bracketed tag right after the Tower number, and an "(N iv)" tag anywhere it sits glued to a name.
+    const stripTags = m => m.replace(/(\[\d+\])\s*\([^)]*\)/g, '$1').replace(/(\S)\(\d+\s*ivs?\)/gi, '$1');
 
     // Joins wrapped lines back onto their message and drops the timestamp/channel
     function messages(lines) {
@@ -41,7 +47,7 @@
             if (STAMP.test(line)) out.push(line.replace(STAMP, ''));
             else if (out.length && line.trim()) out[out.length - 1] += ' ' + line.trim();
         }
-        return out.map(clean).filter(Boolean);
+        return out.map(clean).map(stripTags).filter(Boolean);
     }
 
     const STAT = { 'attack': 'atk', 'defense': 'def', 'sp. atk': 'spa', 'special attack': 'spa', 'sp. def': 'spd',
