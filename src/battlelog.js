@@ -27,7 +27,9 @@
 //                                                                      "Your team's Attack fell!" = Intimidate)
 //   { type: 'itemNoOwner', item: 'Bug Gem' }   ("The Bug Gem strengthened Bug Bite's power!": whoever just moved)
 (function (root) {
-    const STAMP = /^\[\d{1,2}\/\d{1,2}\/\d{2,4} \d{1,2}:\d{2}:\d{2}\] \[Battle\] ?/;
+    // "[21/10/26 22:59:01] [Battle] ..." — the clock follows the player's system settings, so it can also be
+    // 12-hour ("[21/10/26 4:38:45 pm]", "PM", "p. m.") or use another date order/separator. Only the time is required.
+    const STAMP = /^\[[^\]]*?\d{1,2}:\d{2}(?::\d{2})?[^\]]*\] \[Battle\] ?/;
 
     const clean = s => s.replace(/\[#[0-9a-fA-F]*\]/g, '').replace(/\s+/g, ' ').trim();
     // Player Pokémon can show as "Alpha X" or "☆Shiny X☆"; strip both just in case
