@@ -170,6 +170,8 @@
         .partial { margin: 6px auto 0; max-width: 112px; font-size: 11.5px; line-height: 1.3; color: var(--accent); }
         .set.locked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
         .set.out { opacity: .28; }
+        /* Shift+click: ruled out by hand */
+        .set.manual-out { filter: grayscale(1); border-style: dashed; }
         .set.maybe { opacity: .62; }
         .set-top { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; font-family: var(--font-display); min-height: 26px; }
         .item-icon { width: 26px; height: 26px; flex: none; image-rendering: pixelated; margin: -2px -1px -2px -3px; }
@@ -812,6 +814,7 @@ function itemIcon(item) {
 // Auto mode also rules sets out by what the log showed or didn't (see BattleLog.tracker):
 // the ability seen, abilities that would have announced themselves, Choice items, Orbs.
 function setFit(set, pick) {
+    if ((pick.excluded || []).includes(set.set_id)) return 'out';
     const revealed = pick.revealed || [];
     // A seen item rules out sets known to hold something else (and sets with no scouted item stay possible)
     if (pick.item && set.item && norm(set.item) !== norm(pick.item)) return 'out';
@@ -839,6 +842,7 @@ function renderSet(c, pick, idx) {
     if (pick.locked === s.set_id) cls.push('locked');
     else if (pick.locked != null) cls.push('out');
     else { const fit = setFit(s, pick); if (fit) cls.push(fit); }
+    if ((pick.excluded || []).includes(s.set_id)) cls.push('manual-out');
 
     const moves = [0, 1, 2, 3].map(i => {
         const m = (s.moves[i] || '').trim();
@@ -903,6 +907,10 @@ function factsLine(pick) {
     const ni = (pick.noItem || []).filter(i => has('item', i));
     if (ni.some(i => /^Choice /.test(i))) bits.push('no Choice item');
     if (ni.some(i => /Orb$/.test(i))) bits.push('no ' + ni.filter(i => /Orb$/.test(i)).map(esc).join(' / '));
+    const other = ni.filter(i => !/^Choice /.test(i) && !/Orb$/.test(i));
+    if (other.length) bits.push('no ' + other.map(esc).join(' / '));
+    const ex = (pick.excluded || []).filter(id => shown.some(s => s.set_id === id));
+    if (ex.length) bits.push(`set ${ex.join(', ')} ruled out by hand`);
     return bits.length ? `<div class="facts" title="Worked out from the battle log">${bits.join(' · ')}</div>` : '';
 }
 
@@ -1082,6 +1090,8 @@ function wireControls() {
         if (chip) addPick(chip.dataset.species);
     });
 
+    // Shift+click would otherwise select text across the tiles
+    document.getElementById('slots').addEventListener('mousedown', e => { if (e.shiftKey && e.target.closest('.set[data-set]')) e.preventDefault(); });
     document.getElementById('slots').addEventListener('click', e => {
         if (e.ctrlKey || e.metaKey) {
             const tile = e.target.closest('.set[data-set]');
@@ -1090,6 +1100,19 @@ function wireControls() {
         }
         const rm = e.target.closest('[data-remove]');
         if (rm) { state.picks.splice(+rm.dataset.remove, 1); commit(); return; }
+        // Shift+click a set: rule it out by hand (again to bring it back)
+        if (e.shiftKey) {
+            const tile = e.target.closest('.set[data-set]');
+            if (!tile) return;
+            e.preventDefault();
+            const pick = state.picks[+tile.dataset.slot];
+            const id = +tile.dataset.set;
+            const ex = pick.excluded || [];
+            pick.excluded = ex.includes(id) ? ex.filter(x => x !== id) : [...ex, id];
+            if (pick.locked === id && pick.excluded.includes(id)) pick.locked = null;
+            commit();
+            return;
+        }
         const mv = e.target.closest('.move[data-move]');
         if (mv) {
             const pick = state.picks[+mv.dataset.slot];
@@ -1813,6 +1836,7 @@ function newTracker() {
     return BattleLog.tracker({
         abilitiesOf: name => candidates(dataSpecies(name)).filter(c => c.set).map(c => c.set.ability || null),
         typesOf: name => dex.species[norm(dataSpecies(name))] || [],
+        moveInfo: move => dex.moves[norm(move)] || null,
     });
 }
 function applyFacts(facts) {
@@ -1919,8 +1943,10 @@ async function pollAuto() {
         } while (chunk.more);
         let events;
         if (first) {
-            events = BattleLog.parse(lines);
-            auto.push = BattleLog.reader();
+            // A message cut off at its wrap waits in the reader for its second line
+            const { done, held } = BattleLog.split(lines);
+            events = BattleLog.parse(done);
+            auto.push = BattleLog.reader(undefined, held);
             auto.tracker = newTracker();
             // Starting up: only the latest battle matters, and nothing from it is counted on the streak
             const last = events.map(e => e.type).lastIndexOf('challenge');

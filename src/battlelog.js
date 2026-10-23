@@ -11,7 +11,9 @@
 //   { type: 'sentOut', who: 'Youngster CONNER', names: [...] }   (a send-out without a trainer number: the app decides
 //                                                                 whose it is by comparing "who" with the challenger)
 //   { type: 'foeSentOut', index: 2, species: ['Igglybuff', 'Slugma'] }
-//   { type: 'foeMove', species: 'Gulpin', move: 'Water Pulse' }
+//   { type: 'foeMove', species: 'Gulpin', move: 'Water Pulse', hit: true }   (hit: the line shows the damage it did,
+//                                                                        "( Psycho -100% )")
+//   { type: 'moveFailed' }   ("But it failed!", "avoided the attack!", "missed", "It doesn't affect", "protected itself!")
 //   { type: 'foeItem', species: 'Crobat', item: 'Life Orb' }   (any "The foe's X ... its ITEM!" message)
 //   { type: 'won', index: 66 } / { type: 'lost', index: 42 }
 //   { type: 'mySentOut', names: ['Skarmory'] }    (your side; names can be nicknames)
@@ -25,7 +27,7 @@
 //   { type: 'foeStatus', species: 'Tyranitar', status: 'tox' }        (tox / psn / brn / par / slp / frz)
 //   { type: 'foeAbility', species: 'Aerodactyl', ability: 'Pressure' } (species null when the log doesn't name it:
 //                                                                      "Your team's Attack fell!" = Intimidate)
-//   { type: 'itemNoOwner', item: 'Bug Gem' }   ("The Bug Gem strengthened Bug Bite's power!": whoever just moved)
+//   { type: 'itemNoOwner', item: 'Bug Gem', move: 'Bug Bite' }   ("The Bug Gem strengthened Bug Bite's power!": no owner named)
 (function (root) {
     // "[21/10/26 22:59:01] [Battle] ..." — the clock follows the player's system settings, so it can also be
     // 12-hour ("[21/10/26 4:38:45 pm]", "PM", "p. m.") or use another date order/separator. Only the time is required.
@@ -62,7 +64,9 @@
 
     // "...its ꀅLife Orb (ATK)!" -> "Life Orb". Item names in battle text start with an icon glyph (Yi block).
     function itemIn(m) {
-        const r = m.match(/[\ua000-\ua4cf]([^!()\ua000-\ua4cf]+?)\s*(?:\([^)]*\))?(?:!|$|\s+(?:strengthened|weakened|popped))/);
+        const r = m.match(/[\ua000-\ua4cf]([^!()\ua000-\ua4cf]+?)\s*(?:\([^)]*\))?(?:!|$|\s+(?:strengthened|weakened|popped))/)
+               // a tagged name with more text after it: "'s ꀇLum Berry (Status) cured its poison!"
+               || m.match(/[\ua000-\ua4cf]([^!()\ua000-\ua4cf]+?)\s*\([^)]*\)/);
         return r ? r[1].trim() : null;
     }
 
@@ -110,8 +114,13 @@
                 events.push({ type: 'foeWithdrew', index: null, species: monName(r[2]) });    // our own switch reads "X, come back!"
             } else if ((r = m.match(/^The foe's (.+?) fainted!$/))) {
                 events.push({ type: 'foeFainted', species: monName(r[1]) });
-            } else if ((r = m.match(/^The foe's (.+?) used (.+?)!(?: \(.*\))?$/))) {
-                events.push({ type: 'foeMove', species: monName(r[1]), move: clean(r[2]) });
+            } else if ((r = m.match(/^The foe's (.+?) used (.+?)!(?: \((.*)\))?$/))) {
+                events.push({ type: 'foeMove', species: monName(r[1]), move: clean(r[2]), hit: /-\d/.test(r[3] || '') });
+            } else if ((r = m.match(/^The foe's (.+?) (foresaw an attack|chose Doom Desire as its destiny)!$/))) {
+                // Moves the log reports without "used"
+                events.push({ type: 'foeMove', species: monName(r[1]), move: r[2] === 'foresaw an attack' ? 'Future Sight' : 'Doom Desire', hit: false });
+            } else if (/^But it failed!$|avoided the attack!$|attack missed!$| missed!$|^It doesn't affect |protected itself!$/.test(m)) {
+                events.push({ type: 'moveFailed' });
             } else if ((r = m.match(/^The foe's (.+?) is exerting its pressure!$/i))) {
                 events.push({ type: 'foeAbility', species: monName(r[1]), ability: 'Pressure' });
             } else if ((r = m.match(/^The foe's (.+?) traced .+?'s (.+?)!$/))) {
@@ -134,10 +143,10 @@
                 if (it) {
                     if ((r = m.match(/^The foe's (.+?)(?:'s | is | was | restored | ate | consumed | held | became | floats | hung )/))) {
                         events.push({ type: 'foeItem', species: monName(r[1]), item: it });
-                    } else if ((r = m.match(/the foe's (.+?)!$/))) {
+                    } else if ((r = m.match(/the foe's (.+?)(?:'s .*)?!$/))) {   // also "raised the foe's X's Speed!" 
                         events.push({ type: 'foeItem', species: monName(r[1]), item: it });       // "The Chople Berry weakened the damage to the foe's Blissey!"
-                    } else if (/^The .+ strengthened .+'s power!$/.test(m)) {
-                        events.push({ type: 'itemNoOwner', item: it });                         // Gems: whoever just moved
+                    } else if ((r = m.match(/^The .+ strengthened (.+)'s power!$/))) {
+                        events.push({ type: 'itemNoOwner', item: it, move: r[1].trim() });       // Gems: whoever used that move
                     }
                 }
             }
@@ -150,31 +159,54 @@
         return events;
     }
 
-    // The game writes a long message as two lines, and they can land in different reads of the log.
-    // The reader holds back the newest message until the next one starts (or nothing more comes for a moment).
-    function reader(waitMs = 1200) {
-        let pending = [], lastNew = 0;
+    // A message cut off at its wrap ("The foe's Jynx used" with "Ice Beam! ( ... )" still to come).
+    // Every whole battle message ends in ! . ? or a closing bracket.
+    function unfinished(lines) {
+        const m = messages(lines);
+        return m.length > 0 && !/[!.?)\]…]$/.test(m[m.length - 1]);
+    }
+
+    // The game writes a long message as two lines, and they can land in different reads of the log: the game
+    // writes its log in blocks, so with a busy chat the second line can come seconds after the first.
+    // The reader holds back the newest message until the next one starts, or nothing more comes for a moment
+    // and the message is whole. A cut-off message waits for its second line however long that takes.
+    // `held`: lines to start with (the end of the first read, see split()).
+    function reader(waitMs = 1200, held = []) {
+        let pending = held.slice(), lastNew = 0;
         return function push(lines, now = Date.now()) {
             if (lines.length) lastNew = now;
             const all = pending.concat(lines);
             let last = -1;
             for (let i = 0; i < all.length; i++) if (STAMP.test(String(all[i]))) last = i;
-            if (last <= 0 && !lines.length && all.length && now - lastNew >= waitMs) { pending = []; return parse(all); }
+            if (last <= 0 && !lines.length && all.length && now - lastNew >= waitMs && !unfinished(all)) { pending = []; return parse(all); }
             if (last <= 0) { pending = all; return []; }
             pending = all.slice(last);
             return parse(all.slice(0, last));
         };
     }
 
+    // Splits a first read into the lines to parse now and a cut-off last message to hand to reader()
+    function split(lines) {
+        let last = -1;
+        for (let i = 0; i < lines.length; i++) if (STAMP.test(String(lines[i]))) last = i;
+        if (last < 0 || !unfinished(lines.slice(last))) return { done: lines, held: [] };
+        return { done: lines.slice(0, last), held: lines.slice(last) };
+    }
+
 
     // ------------------------------------------------------------
     // Set inference from what the log shows (and doesn't show).
-    // tracker({ abilitiesOf(species) -> [ability|null per possible set], typesOf(species) -> ['Fire', ...] })
+    // tracker({ abilitiesOf(species) -> [ability|null per possible set], typesOf(species) -> ['Fire', ...],
+    //           moveInfo(move) -> [type, category, power] | null })
     // .event(e) takes the events above in order and returns facts for the app to apply to its picks:
     //   { species, ability }            the log showed this ability
     //   { species, noAbility: [...] }   an ability that announces itself on entry, and it didn't
     //   { species, item }               an item seen without a "The foe's X" message (Gems)
-    //   { species, noItem: [...] }      Choice items (two different moves without switching), Orbs (a full turn, no status)
+    //   { species, noItem: [...] }      Choice items (two different moves without switching), Orbs (a full turn, no status),
+    //                                   Gems (a hit of that type with no Gem text), Lum and the matching status berry
+    //                                   (a status that stayed), Air Balloon (came in without the balloon text)
+    // Item checks stop for a Pokémon once its item has shown up (a used Gem / Lum / popped Balloon is gone and
+    // says nothing the next time) or after our Trick / Knock Off.
     // Entry announcements verified in PokeMMO logs (2026-10): Intimidate ("Your team's Attack fell!"),
     // Pressure ("is exerting its pressure!"), Trace ("traced X's Y!"), Sand Stream ("A sandstorm kicked up!").
     const ANNOUNCED = ['Intimidate', 'Pressure', 'Trace'];          // absence rules these out
@@ -182,16 +214,42 @@
     const CALLERS = new Set(['Sleep Talk', 'Metronome', 'Assist', 'Copycat', 'Mirror Move', 'Me First', 'Nature Power']);
     const SWAPS = new Set(['Trick', 'Switcheroo']);
     const OUR_ITEM_MOVES = new Set(['Trick', 'Switcheroo', 'Knock Off', 'Thief', 'Covet', 'Bug Bite', 'Pluck', 'Incinerate']);
+    // Moves whose type isn't the one in the dex (Hidden Power shows only as "Hidden Power"), or that never use a Gem
+    const NO_GEM_CHECK = new Set(['hiddenpower', 'weatherball', 'naturalgift', 'judgment', 'technoblast', 'struggle', 'fling',
+                                  'firepledge', 'grasspledge', 'waterpledge', 'futuresight', 'doomdesire']);
+    // Damaging moves with no fixed power in the dex
+    const VARIABLE_POWER = new Set(['return', 'frustration', 'gyroball', 'lowkick', 'grassknot', 'heavyslam', 'heatcrash',
+                                    'electroball', 'flail', 'reversal', 'crushgrip', 'wringout', 'punishment', 'storedpower', 'magnitude']);
+    // Status berries that cure one status (Lum cures them all)
+    const STATUS_BERRY = { tox: 'Pecha Berry', psn: 'Pecha Berry', brn: 'Rawst Berry', par: 'Cheri Berry', slp: 'Chesto Berry', frz: 'Aspear Berry' };
 
     function tracker(opts) {
         const abilitiesOf = opts.abilitiesOf || (() => []);
         const typesOf = opts.typesOf || (() => []);
+        const moveInfo = opts.moveInfo || (() => null);
         const key = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        let mons, entry, turnSeen, faintedThisTurn, lastMove;
-        const reset = () => { mons = new Map(); entry = null; turnSeen = false; faintedThisTurn = false; lastMove = null; };
+        // gemCheck: a foe's hit waiting to see if a Gem text comes; statusCheck: a status waiting for a berry;
+        // gemsBefore: Gem texts that came before the "used" line they belong to
+        let mons, entry, turnSeen, faintedThisTurn, lastMove, gemCheck, statusCheck, gemsBefore;
+        const reset = () => { mons = new Map(); entry = null; turnSeen = false; faintedThisTurn = false; lastMove = null;
+                              gemCheck = null; statusCheck = null; gemsBefore = []; };
         reset();
         const mon = sp => mons.get(key(sp));
         const couldHave = (sp, ab) => abilitiesOf(sp).some(a => a === null || key(a) === key(ab));
+        // Its item can still be reasoned about from what doesn't happen
+        const itemUnknown = m => m && !m.swapped && !m.itemSeen;
+
+        // A message closes the checks waiting on it: the next move, turn, switch or faint
+        function settle(out) {
+            if (gemCheck) {
+                const g = gemCheck; gemCheck = null;
+                if (!g.seen && !g.failed && itemUnknown(mon(g.species))) out.push({ species: g.species, noItem: [g.type + ' Gem'] });
+            }
+            if (statusCheck) {
+                const c = statusCheck; statusCheck = null;
+                if (!c.cured && itemUnknown(mon(c.species))) out.push({ species: c.species, noItem: ['Lum Berry', STATUS_BERRY[c.status]] });
+            }
+        }
 
         function closeEntry(out) {
             if (!entry) return;
@@ -211,6 +269,8 @@
                 for (const ab of seen) out.push({ species: sp, ability: ab });
                 const absent = ANNOUNCED.filter(ab => !seen.has(ab) && !(ab === 'Intimidate' && e.intimidate));
                 if (absent.length) out.push({ species: sp, noAbility: absent });
+                // "The foe's X floats in the air with its Air Balloon!" comes as it lands
+                if (!e.balloon.has(key(sp)) && itemUnknown(mon(sp))) out.push({ species: sp, noItem: ['Air Balloon'] });
             }
         }
 
@@ -218,19 +278,29 @@
             const out = [];
             switch (ev.type) {
                 case 'challenge': reset(); break;
-                case 'won': case 'lost': closeEntry(out); reset(); break;
+                case 'won': case 'lost': settle(out); closeEntry(out); reset(); break;
                 case 'foeSentOut':
-                    if (!entry) entry = { species: [], named: new Map(), intimidate: 0, weather: [] };
+                    settle(out);
+                    if (!entry) entry = { species: [], named: new Map(), intimidate: 0, weather: [], balloon: new Set() };
                     for (const sp of ev.species) {
                         entry.species.push(sp);
                         // Orb timing: a lead or a replacement after a faint arrives after this turn's end-of-turn effects;
                         // a mid-turn switch-in is there for them
                         mons.set(key(sp), { species: sp, active: true, armed: turnSeen && !faintedThisTurn,
-                                            statused: (mon(sp) || {}).statused || false, first: null, calling: false, swapped: (mon(sp) || {}).swapped || false, choiceOut: (mon(sp) || {}).choiceOut || false });
+                                            statused: (mon(sp) || {}).statused || false, first: null, calling: false, swapped: (mon(sp) || {}).swapped || false, choiceOut: (mon(sp) || {}).choiceOut || false,
+                                            itemSeen: (mon(sp) || {}).itemSeen || false });
                     }
                     break;
-                case 'foeWithdrew': { const m = mon(ev.species); if (m) m.active = false; break; }
-                case 'foeFainted': { const m = mon(ev.species); if (m) m.active = false; faintedThisTurn = true; break; }
+                case 'foeWithdrew': { settle(out); const m = mon(ev.species); if (m) m.active = false; break; }
+                case 'foeFainted': { settle(out); const m = mon(ev.species); if (m) m.active = false; faintedThisTurn = true; break; }
+                case 'foeItem': {
+                    const m = mon(ev.species);
+                    if (entry && key(ev.item) === 'airballoon') entry.balloon.add(key(ev.species));
+                    if (statusCheck && key(statusCheck.species) === key(ev.species)) statusCheck.cured = true;
+                    if (m) m.itemSeen = true;
+                    break;
+                }
+                case 'moveFailed': if (gemCheck) gemCheck.failed = true; break;
                 case 'foeAbility':
                     if (ev.species) {
                         if (entry && entry.species.some(sp => key(sp) === key(ev.species))) {
@@ -239,9 +309,19 @@
                     } else if (ev.ability === 'Intimidate' && entry) entry.intimidate++;
                     break;
                 case 'weather': if (entry) entry.weather.push(ev.ability); break;
-                case 'foeStatus': { const m = mon(ev.species); if (m) m.statused = true; break; }
+                case 'foeStatus': {
+                    const m = mon(ev.species);
+                    if (!m) break;
+                    // A berry cures it straight away. Paralysis also shows "is paralyzed" on a turn it can't move:
+                    // that's a status that already stuck, so it doesn't start a check.
+                    if (!m.statused && STATUS_BERRY[ev.status]) { settle(out); statusCheck = { species: m.species, status: ev.status, cured: false }; }
+                    m.statused = true;
+                    break;
+                }
                 case 'turn':
+                    settle(out);
                     closeEntry(out);
+                    gemsBefore = [];
                     for (const m of mons.values()) {
                         if (!m.active) continue;
                         // It has been through a whole end of turn with no status: no Orb (unless it can't be statused by it)
@@ -258,16 +338,28 @@
                     turnSeen = true; faintedThisTurn = false;
                     break;
                 case 'myMove':
+                    settle(out);
                     closeEntry(out);
+                    gemsBefore = [];
                     // Our Trick / Knock Off / Thief: the foe's item may have changed, stop guessing about it
                     if (OUR_ITEM_MOVES.has(ev.move)) for (const m of mons.values()) if (m.active) m.swapped = true;
-                    lastMove = { foe: false };
+                    lastMove = { foe: false, move: ev.move };
                     break;
                 case 'foeMove': {
+                    settle(out);
                     closeEntry(out);
                     const m = mon(ev.species);
-                    lastMove = { foe: true, species: ev.species };
+                    lastMove = { foe: true, species: ev.species, move: ev.move };
+                    // A Gem text just before this line, naming this move, was this Pokémon's
+                    const before = gemsBefore.find(g => key(g.move) === key(ev.move));
+                    gemsBefore = [];
+                    if (before) out.push({ species: ev.species, item: before.item });
                     if (!m) break;
+                    if (before) m.itemSeen = true;
+                    // A hit (the line shows the damage) of a type it could have a Gem for, and no Gem text: no Gem
+                    const info = moveInfo(ev.move);
+                    if (ev.hit && !before && info && !NO_GEM_CHECK.has(key(ev.move)) && (info[2] > 0 || VARIABLE_POWER.has(key(ev.move))) && itemUnknown(m))
+                        gemCheck = { species: m.species, move: ev.move, type: info[0], seen: false, failed: false };
                     if (/^struggle$/i.test(ev.move)) break;
                     if (m.calling) { m.calling = false; break; }          // the move Sleep Talk & co. called
                     if (CALLERS.has(ev.move)) m.calling = true;
@@ -278,7 +370,17 @@
                     break;
                 }
                 case 'itemNoOwner':
-                    if (lastMove && lastMove.foe) out.push({ species: lastMove.species, item: ev.item });
+                    if (gemCheck && (!ev.move || key(ev.move) === key(gemCheck.move))) {
+                        gemCheck.seen = true;
+                        const m = mon(gemCheck.species); if (m) m.itemSeen = true;
+                        out.push({ species: gemCheck.species, item: ev.item });
+                    } else if (ev.move && lastMove && lastMove.foe && key(lastMove.move) === key(ev.move)) {
+                        const m = mon(lastMove.species); if (m) m.itemSeen = true;
+                        out.push({ species: lastMove.species, item: ev.item });
+                    } else if (ev.move && lastMove && !lastMove.foe && key(lastMove.move) === key(ev.move)) {
+                        // our own Gem
+                    } else if (ev.move) gemsBefore.push(ev);        // the "used" line may come after it
+                    else if (lastMove && lastMove.foe) out.push({ species: lastMove.species, item: ev.item });
                     break;
             }
             return out;
@@ -286,7 +388,7 @@
         return { event };
     }
 
-    const api = { parse, messages, reader, tracker };
+    const api = { parse, messages, reader, split, tracker };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.BattleLog = api;
 })(this);

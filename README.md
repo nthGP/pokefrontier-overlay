@@ -31,6 +31,7 @@ When a new version is out, an **Update** button appears in the top bar.
 - **Click a move** when the opponent uses it. Sets that can't have that move fade out. Sets with unscouted move slots
   that could still have it fade halfway.
 - **Click a set** to lock it in once you know which one it is.
+- **Shift+click a set** to rule it out by hand: it greys out (OBS too). Shift+click it again to bring it back.
 - **Esc** or **Clear** starts the next battle.
 
 **Auto mode** (fills everything in for you)
@@ -50,8 +51,15 @@ When a new version is out, an **Update** button appears in the top bar.
   - **Choice items:** two different moves without switching out rules out Choice Band, Specs and Scarf.
     Sleep Talk's called moves, Struggle and Trick are ignored.
   - **Orbs:** a whole turn on the field with no status rules out Flame Orb and Toxic Orb. If it was already statused
-    (say, you Toxic'd it first), nothing is ruled out. Items seen in the log (Life Orb, Gems, berries, Air Balloon,
-    Focus Sash…) are applied too.
+    (say, you Toxic'd it first), nothing is ruled out.
+  - **Gems:** a hit that does damage with no "The … Gem strengthened …" text rules out the Gem of that move's type
+    (Hidden Power, Weather Ball and fixed-damage moves like Seismic Toss are skipped).
+  - **Lum Berry:** a status that sticks (your Toxic, a burn, sleep…) with no berry text rules out Lum Berry and the
+    berry for that status (Pecha, Rawst, Cheri, Chesto, Aspear).
+  - **Air Balloon:** coming in without "floats in the air with its Air Balloon!" rules out Air Balloon.
+  - Once a Pokémon's item has shown up (a Gem used, a Balloon popped) or after your Trick / Knock Off, these item checks
+    stop for it, since a used item says nothing the next time.
+  - Items seen in the log (Life Orb, Gems, berries, Air Balloon, Focus Sash…) are applied too.
 - Only battle messages are read. Team, whisper and global chat are skipped inside the app and never shown, saved or sent.
 - Tower and Factory still come from the switch at the top: the log doesn't say which facility you're in.
 - Everything stays clickable, so you can still fix anything by hand.
