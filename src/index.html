@@ -809,6 +809,23 @@ function itemIcon(item) {
         onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'item-name', textContent: this.alt }))">`;
 }
 
+// Move names: the game, the sheet and the calc spell some moves differently. Case, spaces and dashes never
+// matter (ThunderPunch = Thunder Punch, Selfdestruct = Self-Destruct); these are real renames between gens.
+const MOVE_ALIAS = { hijumpkick: 'highjumpkick', feintattack: 'faintattack', smellingsalt: 'smellingsalts' };
+const moveKey = m => { const k = norm(m); return MOVE_ALIAS[k] || k; };
+const HP_TYPES = ['bug', 'dark', 'dragon', 'electric', 'fighting', 'fire', 'flying', 'ghost', 'grass', 'ground',
+                  'ice', 'poison', 'psychic', 'rock', 'steel', 'water'];
+// Does a move the opponent used match a move on a set?
+// The log only says "Hidden Power" (the type comes from scouting), so it matches any Hidden Power on a set.
+// A typed one you clicked yourself ("Hidden Power Fire") matches the same type, or a set whose type isn't known.
+function sameMove(used, onSet) {
+    const a = moveKey(used), b = moveKey(onSet);
+    if (a === b) return true;
+    if (!a.startsWith('hiddenpower') || !b.startsWith('hiddenpower')) return false;
+    const typeOf = k => HP_TYPES.find(t => k === 'hiddenpower' + t) || null;
+    return !typeOf(a) || !typeOf(b);
+}
+
 // A set is "out" if it has 4 known moves and lacks a revealed one,
 // "maybe" if a revealed move could still be in one of its unscouted slots.
 // Auto mode also rules sets out by what the log showed or didn't (see BattleLog.tracker):
@@ -822,8 +839,8 @@ function setFit(set, pick) {
     if (pick.ability && set.ability && norm(set.ability) !== norm(pick.ability)) return 'out';
     if (set.ability && (pick.noAbility || []).some(a => norm(a) === norm(set.ability))) return 'out';
     if (!revealed.length) return '';
-    const known = set.moves.filter(m => m && m.trim()).map(norm);
-    const missing = revealed.filter(m => !known.includes(norm(m)));
+    const known = set.moves.filter(m => m && m.trim());
+    const missing = revealed.filter(m => !known.some(k => sameMove(m, k)));
     if (!missing.length) return '';
     return missing.length <= 4 - known.length ? 'maybe' : 'out';
 }
@@ -849,7 +866,7 @@ function renderSet(c, pick, idx) {
         if (!m) return `<span class="move blank">Unknown</span>`;
         const info = dex.moves[norm(m)];
         const type = info ? info[0] : 'Unknown';
-        const rev = pick.revealed.some(r => norm(r) === norm(m)) ? ' revealed' : '';
+        const rev = pick.revealed.some(r => sameMove(r, m)) ? ' revealed' : '';
         return `<button class="move t-${type}${rev}" data-move="${esc(m)}" data-slot="${idx}" title="${esc(m)} · ${type}${info && info[2] ? ' · ' + info[2] + ' BP' : ''}">${esc(m)}</button>`;
     }).join('');
 
@@ -1117,8 +1134,9 @@ function wireControls() {
         if (mv) {
             const pick = state.picks[+mv.dataset.slot];
             const m = mv.dataset.move;
-            const i = pick.revealed.findIndex(r => norm(r) === norm(m));
-            if (i >= 0) pick.revealed.splice(i, 1); else pick.revealed.push(m);
+            // Clicking a marked move unmarks it (also a plain "Hidden Power" from the log shown on a typed one)
+            if (pick.revealed.some(r => sameMove(r, m))) pick.revealed = pick.revealed.filter(r => !sameMove(r, m));
+            else pick.revealed.push(m);
             commit();
             return;
         }
@@ -1836,7 +1854,7 @@ function newTracker() {
     return BattleLog.tracker({
         abilitiesOf: name => candidates(dataSpecies(name)).filter(c => c.set).map(c => c.set.ability || null),
         typesOf: name => dex.species[norm(dataSpecies(name))] || [],
-        moveInfo: move => dex.moves[norm(move)] || null,
+        moveInfo: move => dex.moves[moveKey(move)] || null,
     });
 }
 function applyFacts(facts) {
@@ -1910,7 +1928,7 @@ function applyBattleEvents(events, replay) {
         } else if (e.type === 'foeMove') {
             if (/^struggle$/i.test(e.move)) continue;
             const pick = state.picks.find(p => norm(p.species) === norm(e.species));
-            if (pick && !pick.revealed.some(m => norm(m) === norm(e.move))) { pick.revealed.push(e.move); changed = true; }
+            if (pick && !pick.revealed.some(m => moveKey(m) === moveKey(e.move))) { pick.revealed.push(e.move); changed = true; }
         } else if (e.type === 'foeItem') {
             const pick = state.picks.find(p => norm(p.species) === norm(e.species));
             // Only items some set actually holds (the game's names can differ, e.g. Covert Mantle)

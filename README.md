@@ -30,6 +30,9 @@ When a new version is out, an **Update** button appears in the top bar.
 **During the battle**
 - **Click a move** when the opponent uses it. Sets that can't have that move fade out. Sets with unscouted move slots
   that could still have it fade halfway.
+  The log only says "Hidden Power", so it matches any Hidden Power on a set; clicking a typed one (Hidden Power Fire)
+  keeps only that type (and sets whose Hidden Power type isn't scouted). Spelling differences between the game and the
+  sheet (ThunderPunch / Thunder Punch, Selfdestruct / Self-Destruct, Hi Jump Kick / High Jump Kick) don't matter.
 - **Click a set** to lock it in once you know which one it is.
 - **Shift+click a set** to rule it out by hand: it greys out (OBS too). Shift+click it again to bring it back.
 - **Esc** or **Clear** starts the next battle.
