@@ -12,7 +12,8 @@
 //                                                                 whose it is by comparing "who" with the challenger)
 //   { type: 'foeSentOut', index: 2, species: ['Igglybuff', 'Slugma'] }
 //   { type: 'foeMove', species: 'Gulpin', move: 'Water Pulse', hit: true }   (hit: the line shows the damage it did,
-//                                                                        "( Psycho -100% )")
+//                                                                        "( Psycho -100% )"; heal: it shows a heal,
+//                                                                        "( Starmie +42,5% )")
 //   { type: 'moveFailed' }   ("But it failed!", "avoided the attack!", "missed", "It doesn't affect", "protected itself!")
 //   { type: 'foeItem', species: 'Crobat', item: 'Life Orb' }   (any "The foe's X ... its ITEM!" message)
 //   { type: 'won', index: 66 } / { type: 'lost', index: 42 }
@@ -26,6 +27,11 @@
 //                                                            "( Dugtrio -99% )" part, damage as % of the target's max HP)
 //   { type: 'foeWithdrew', index: 245, species: 'Crobat' }
 //   { type: 'foeFainted', species: 'Crobat' }
+//   { type: 'foeHurt', species: 'Starmie', eot: true }   (poison, burn, sandstorm, hail: end of turn; eot false:
+//                                                        "Pointed stones dug into the foe's X!" on entry)
+//   { type: 'foeHealed', species: 'Wailord' }            ("The foe's X had its HP restored." after Rest, a berry...)
+//   { type: 'cured', name: 'Starmie' }                   ("Starmie was cured of its poisoning.": Natural Cure on the way
+//                                                        out, or Rest; no "The foe's", so it can be either side)
 //   { type: 'foeStatus', species: 'Tyranitar', status: 'tox' }        (tox / psn / brn / par / slp / frz)
 //   { type: 'foeAbility', species: 'Aerodactyl', ability: 'Pressure' } (species null when the log doesn't name it:
 //                                                                      "Your team's Attack fell!" = Intimidate;
@@ -123,8 +129,16 @@
                 events.push({ type: 'foeWithdrew', index: null, species: monName(r[2]) });    // our own switch reads "X, come back!"
             } else if ((r = m.match(/^The foe's (.+?) fainted!$/))) {
                 events.push({ type: 'foeFainted', species: monName(r[1]) });
+            } else if ((r = m.match(/^The foe's (.+?) (?:was hurt by (?:poison|its burn)|is buffeted by the sandstorm|is pelted by hail)!$/))) {
+                events.push({ type: 'foeHurt', species: monName(r[1]), eot: true });
+            } else if ((r = m.match(/^Pointed stones dug into the foe's (.+?)!$/))) {
+                events.push({ type: 'foeHurt', species: monName(r[1]), eot: false });
+            } else if ((r = m.match(/^The foe's (.+?) had its HP restored\.?$/))) {
+                events.push({ type: 'foeHealed', species: monName(r[1]) });
+            } else if ((r = m.match(/^(?!The foe's )(.+?) was cured of its (?:poisoning|burn|paralysis|sleep|freezing|freeze)\.?!?$/))) {
+                events.push({ type: 'cured', name: monName(r[1]) });
             } else if ((r = m.match(/^The foe's (.+?) used (.+?)!(?: \((.*)\))?$/))) {
-                events.push({ type: 'foeMove', species: monName(r[1]), move: clean(r[2]), hit: /-\d/.test(r[3] || '') });
+                events.push({ type: 'foeMove', species: monName(r[1]), move: clean(r[2]), hit: /-\d/.test(r[3] || ''), heal: /\+\d/.test(r[3] || '') });
             } else if ((r = m.match(/^The foe's (.+?) (foresaw an attack|chose Doom Desire as its destiny)!$/))) {
                 // Moves the log reports without "used"
                 events.push({ type: 'foeMove', species: monName(r[1]), move: r[2] === 'foresaw an attack' ? 'Future Sight' : 'Doom Desire', hit: false });
@@ -217,7 +231,10 @@
     //   { species, noItem: [...] }      Choice items (two different moves without switching), Orbs (a full turn, no status),
     //                                   Gems (a hit of that type with no Gem text), Lum and the matching status berry
     //                                   (a status that stayed), Air Balloon (came in without the balloon text),
-    //                                   Focus Sash (one of our hits took it from full HP to 0 with no "hung on" text)
+    //                                   Focus Sash (one of our hits took it from full HP to 0 with no "hung on" text),
+    //                                   Life Orb (a hit with no recoil line right after it), Leftovers (an end of turn
+    //                                   below full HP with no Leftovers text; Black Sludge too for Poison types)
+    //   { species, ability: 'Natural Cure' } cured of its status as it switched out
     //   { species, noAbility: ['Sturdy'] } the same one-hit KO from full HP
     // Item checks stop for a Pokémon once its item has shown up (a used Gem / Lum / popped Balloon is gone and
     // says nothing the next time) or after our Trick / Knock Off.
@@ -240,6 +257,12 @@
                                'doublekick', 'doubleslap', 'dualchop', 'furyattack', 'furyswipes', 'geargrind', 'iciclespear',
                                'pinmissile', 'rockblast', 'spikecannon', 'tailslap', 'triplekick', 'twineedle', 'beatup',
                                'dragondarts', 'scaleshot', 'surgingstrikes', 'tripleaxel', 'watershuriken', 'populationbomb']);
+    // Fixed-damage moves: no Life Orb boost, so no recoil to expect
+    const FIXED_DAMAGE = new Set(['seismictoss', 'nightshade', 'superfang', 'endeavor', 'psywave', 'dragonrage', 'sonicboom',
+                                  'counter', 'mirrorcoat', 'metalburst', 'finalgambit', 'bide', 'struggle']);
+    // Items that heal their holder (seen: it may be at full HP again, so Leftovers can't be judged until it's hurt again)
+    const HEALING_ITEMS = new Set(['leftovers', 'blacksludge', 'shellbell', 'sitrusberry', 'oranberry', 'figyberry', 'wikiberry',
+                                   'magoberry', 'aguavberry', 'iapapaberry', 'berryjuice', 'enigmaberry']);
     const STATUS_BERRY = { tox: 'Pecha Berry', psn: 'Pecha Berry', brn: 'Rawst Berry', par: 'Cheri Berry', slp: 'Chesto Berry', frz: 'Aspear Berry' };
 
     function tracker(opts) {
@@ -249,12 +272,16 @@
         const key = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         // gemCheck: a foe's hit waiting to see if a Gem text comes; statusCheck: a status waiting for a berry;
         // gemsBefore: Gem texts that came before the "used" line they belong to
-        let mons, entry, turnSeen, faintedThisTurn, lastMove, gemCheck, statusCheck, gemsBefore;
+        // orbCheck: a foe's hit waiting to see if Life Orb recoil follows; cured: a "was cured" line waiting to see
+        // if the foe switches out next (Natural Cure)
+        let mons, entry, turnSeen, faintedThisTurn, lastMove, gemCheck, statusCheck, gemsBefore, orbCheck, cured;
         const reset = () => { mons = new Map(); entry = null; turnSeen = false; faintedThisTurn = false; lastMove = null;
-                              gemCheck = null; statusCheck = null; gemsBefore = []; };
+                              gemCheck = null; statusCheck = null; gemsBefore = []; orbCheck = null; cured = null; };
         reset();
         const mon = sp => mons.get(key(sp));
         const couldHave = (sp, ab) => abilitiesOf(sp).some(a => a === null || key(a) === key(ab));
+        // A set known to have it (unscouted abilities don't count)
+        const knownHave = (sp, ab) => abilitiesOf(sp).some(a => a && key(a) === key(ab));
         // Its item can still be reasoned about from what doesn't happen
         const itemUnknown = m => m && !m.swapped && !m.itemSeen;
 
@@ -267,6 +294,11 @@
             if (statusCheck) {
                 const c = statusCheck; statusCheck = null;
                 if (!c.cured && itemUnknown(mon(c.species))) out.push({ species: c.species, noItem: ['Lum Berry', STATUS_BERRY[c.status]] });
+            }
+            if (orbCheck) {
+                const c = orbCheck; orbCheck = null;
+                const m = mon(c.species);
+                if (!c.seen && itemUnknown(m) && !m.lifeOrbOut) { m.lifeOrbOut = true; out.push({ species: c.species, noItem: ['Life Orb'] }); }
             }
         }
 
@@ -293,8 +325,13 @@
             }
         }
 
+        // Its HP is below full for sure (it took damage and hasn't healed since)
+        const hurt = sp => { const m = mon(sp); if (m && m.active) m.hurt = true; };
+        const healed = sp => { const m = mon(sp); if (m) { m.hurt = false; m.hurtEot = false; } };
+
         function event(ev) {
             const out = [];
+            const wasCured = cured; cured = null;
             switch (ev.type) {
                 case 'challenge': reset(); break;
                 case 'won': case 'lost': settle(out); closeEntry(out); reset(); break;
@@ -310,10 +347,28 @@
                                             itemSeen: (mon(sp) || {}).itemSeen || false });
                     }
                     break;
-                case 'foeWithdrew': { settle(out); const m = mon(ev.species); if (m) m.active = false; break; }
+                case 'foeWithdrew': {
+                    settle(out);
+                    const m = mon(ev.species);
+                    if (m) m.active = false;
+                    // "X was cured of its poisoning." just before it left: Natural Cure
+                    if (wasCured && key(wasCured) === key(ev.species) && !(m && m.traced)) out.push({ species: m ? m.species : ev.species, ability: 'Natural Cure' });
+                    break;
+                }
+                case 'cured': cured = ev.name; break;
+                case 'foeHurt': {
+                    const m = mon(ev.species);
+                    if (!m) break;
+                    // End-of-turn damage comes after Leftovers in that same end of turn, so it counts from the next one
+                    if (ev.eot) m.hurtEot = true; else hurt(ev.species);
+                    break;
+                }
+                case 'foeHealed': healed(ev.species); break;
                 case 'foeFainted': { settle(out); const m = mon(ev.species); if (m) m.active = false; faintedThisTurn = true; break; }
                 case 'foeItem': {
                     const m = mon(ev.species);
+                    if (orbCheck && key(orbCheck.species) === key(ev.species) && key(ev.item) === 'lifeorb') orbCheck.seen = true;
+                    if (HEALING_ITEMS.has(key(ev.item))) healed(ev.species);
                     if (entry && key(ev.item) === 'airballoon') entry.balloon.add(key(ev.species));
                     if (statusCheck && key(statusCheck.species) === key(ev.species)) statusCheck.cured = true;
                     if (m) m.itemSeen = true;
@@ -321,6 +376,8 @@
                 }
                 case 'moveFailed': if (gemCheck) gemCheck.failed = true; break;
                 case 'foeAbility':
+                    // A traced Natural Cure (Porygon copying Chansey's) is no clue to its own ability
+                    if (ev.species && ev.ability === 'Trace' && mon(ev.species)) mon(ev.species).traced = true;
                     if (ev.species) {
                         if (entry && entry.species.some(sp => key(sp) === key(ev.species))) {
                             const set = entry.named.get(key(ev.species)) || new Set(); set.add(ev.ability); entry.named.set(key(ev.species), set);
@@ -343,6 +400,12 @@
                     gemsBefore = [];
                     for (const m of mons.values()) {
                         if (!m.active) continue;
+                        // A whole end of turn below full HP and no Leftovers text: no Leftovers (Black Sludge for Poison types)
+                        if (m.armed && m.hurt && itemUnknown(m) && !m.leftOut) {
+                            m.leftOut = true;
+                            out.push({ species: m.species, noItem: typesOf(m.species).includes('Poison') ? ['Leftovers', 'Black Sludge'] : ['Leftovers'] });
+                        }
+                        if (m.hurtEot) { m.hurt = true; m.hurtEot = false; }
                         // It has been through a whole end of turn with no status: no Orb (unless it can't be statused by it)
                         if (m.armed && !m.statused && !m.swapped && !m.orbOut) {
                             const t = typesOf(m.species);
@@ -362,6 +425,7 @@
                     gemsBefore = [];
                     // A one-hit KO from full HP ("-100%": the shown damage stops at the HP it had) with no "hung on"
                     // text: no Focus Sash, no Sturdy. With either, the line would read -99% and "hung on" would follow.
+                    for (const h of ev.hits || []) if (h.pct > 0) hurt(h.name);
                     if (!MULTI_HIT.has(key(ev.move))) {
                         for (const h of ev.hits || []) {
                             const m = mon(h.name);
@@ -385,6 +449,12 @@
                     if (before) out.push({ species: ev.species, item: before.item });
                     if (!m) break;
                     if (before) m.itemSeen = true;
+                    if (ev.heal) healed(ev.species);
+                    // A hit that showed its damage, with no "hurt by its Life Orb" after it: no Life Orb.
+                    // Magic Guard and Sheer Force (on moves with an effect) stop the recoil, so sets with them are skipped.
+                    if (ev.hit && !FIXED_DAMAGE.has(key(ev.move)) && itemUnknown(m) && !m.lifeOrbOut
+                        && !knownHave(m.species, 'Magic Guard') && !knownHave(m.species, 'Sheer Force'))
+                        orbCheck = { species: m.species, seen: false };
                     // A hit (the line shows the damage) of a type it could have a Gem for, and no Gem text: no Gem
                     const info = moveInfo(ev.move);
                     if (ev.hit && !before && info && !NO_GEM_CHECK.has(key(ev.move)) && (info[2] > 0 || VARIABLE_POWER.has(key(ev.move))) && itemUnknown(m))

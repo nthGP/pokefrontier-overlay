@@ -49,6 +49,47 @@ test('not for a hit under 100%', () => {
     assert(!f.some(x => (x.noItem || []).includes('Focus Sash')));
 });
 
+const lead = [L('2:00:00', 'You are challenged by Fisherman BAILEY[280]!'), L('2:00:01', 'Fisherman BAILEY[280] sent out Starmie!'),
+              L('2:00:02', 'Turn 1 started!')];
+test('a hit with no recoil line rules out Life Orb', () => {
+    const f = run([...lead, L('2:00:03', "The foe's Starmie used Scald! ( Alpha Slowking -12,4% )"), L('2:00:04', 'Turn 2 started!')]);
+    assert(f.some(x => x.species === 'Starmie' && (x.noItem || []).includes('Life Orb')));
+});
+test('...but not when the recoil line follows', () => {
+    const f = run([...lead, L('2:00:03', "The foe's Starmie used Scald! ( Alpha Slowking -12,4% )"),
+                   L('2:00:04', "The foe's Starmie is hurt by its \ua005Life Orb (ATK)!"), L('2:00:05', 'Turn 2 started!')]);
+    assert(!f.some(x => (x.noItem || []).includes('Life Orb')));
+});
+test('...nor for Seismic Toss, or a set with Sheer Force', () => {
+    assert(!run([...lead, L('2:00:03', "The foe's Starmie used Seismic Toss! ( Chansey -20% )"), L('2:00:04', 'Turn 2 started!')])
+        .some(x => (x.noItem || []).includes('Life Orb')));
+    const t = B.tracker({ abilitiesOf: () => ['Sheer Force', null], typesOf: () => [], moveInfo: () => null });
+    const f = B.parse([...lead, L('2:00:03', "The foe's Starmie used Scald! ( Alpha Slowking -12,4% )"), L('2:00:04', 'Turn 2 started!')]).flatMap(e => t.event(e));
+    assert(!f.some(x => (x.noItem || []).includes('Life Orb')));
+});
+test('an end of turn below full HP with no Leftovers text rules out Leftovers', () => {
+    const f = run([...lead, L('2:00:03', 'Gliscor used Earthquake! ( Starmie -30% )'), L('2:00:04', 'Turn 2 started!')]);
+    assert(f.some(x => x.species === 'Starmie' && (x.noItem || []).includes('Leftovers')));
+});
+test('...not at full HP, after a heal, or with poison only from this end of turn', () => {
+    const none = lines => !run(lines).some(x => (x.noItem || []).includes('Leftovers'));
+    assert(none([...lead, L('2:00:03', 'Gliscor used Protect!'), L('2:00:04', 'Turn 2 started!')]));
+    assert(none([...lead, L('2:00:03', 'Gliscor used Earthquake! ( Starmie -30% )'), L('2:00:04', "The foe's Starmie used Recover! ( Starmie +30% )"),
+                 L('2:00:05', 'Turn 2 started!')]));
+    assert(none([...lead, L('2:00:03', "The foe's Starmie was hurt by poison!"), L('2:00:04', 'Turn 2 started!')]));
+    assert(!none([...lead, L('2:00:03', "The foe's Starmie was hurt by poison!"), L('2:00:04', 'Turn 2 started!'), L('2:00:05', 'Turn 3 started!')]));
+});
+test('cured as it switches out: Natural Cure (not after Rest, not a traced one)', () => {
+    const out = [L('2:00:03', 'Starmie was cured of its poisoning.'), L('2:00:04', 'Fisherman BAILEY[280] withdrew Starmie!')];
+    assert(run([...lead, ...out]).some(x => x.species === 'Starmie' && x.ability === 'Natural Cure'));
+    assert(!run([...lead, L('2:00:03', "The foe's Starmie fell asleep!"), L('2:00:03', 'Starmie was cured of its poisoning.'),
+                 L('2:00:04', 'Turn 2 started!')]).some(x => x.ability === 'Natural Cure'));
+    const traced = [L('3:00:00', 'You are challenged by Fisherman BAILEY[280]!'), L('3:00:01', 'Fisherman BAILEY[280] sent out Porygon!'),
+                    L('3:00:02', "The foe's Porygon traced Chansey's Natural Cure!"), L('3:00:03', 'Turn 1 started!'),
+                    L('3:00:04', 'Porygon was cured of its poisoning.'), L('3:00:05', 'Fisherman BAILEY[280] withdrew Porygon!')];
+    assert(!run(traced).some(x => x.ability === 'Natural Cure'));
+});
+
 // ---------------------------------------------------------------- debug log
 const NAME = 'Nithyyy';
 function battle(t, idx, extra = []) {
