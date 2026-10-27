@@ -35,6 +35,9 @@ jobs:
         with:
           node-version: 20
 
+      # Parser and debug-log checks (no dependencies)
+      - run: node scripts/test.js
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2

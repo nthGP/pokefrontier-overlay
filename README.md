@@ -60,10 +60,19 @@ When a new version is out, an **Update** button appears in the top bar.
   - **Lum Berry:** a status that sticks (your Toxic, a burn, sleep…) with no berry text rules out Lum Berry and the
     berry for that status (Pecha, Rawst, Cheri, Chesto, Aspear).
   - **Air Balloon:** coming in without "floats in the air with its Air Balloon!" rules out Air Balloon.
+  - **Focus Sash / Sturdy:** "hung on using its Focus Sash!" shows the item, and "hung on using its Sturdy!" the ability.
+    If one of your hits takes it from full HP to 0 in one go (the line shows `-100%`) with no "hung on", sets with
+    Focus Sash or Sturdy fade (multi-hit moves are skipped: the log adds their hits up). A Mold Breaker attacker
+    on your side would wrongly rule out Sturdy; if you use one, check by hand.
   - Once a Pokémon's item has shown up (a Gem used, a Balloon popped) or after your Trick / Knock Off, these item checks
     stop for it, since a used item says nothing the next time.
   - Items seen in the log (Life Orb, Gems, berries, Air Balloon, Focus Sash…) are applied too.
 - Only battle messages are read. Team, whisper and global chat are skipped inside the app and never shown, saved or sent.
+- **Debug log:** if auto mode gets something wrong (wrong set, a move not picked up), click **Auto** → **Save debug log**
+  and send the file it saves (in your Downloads folder) with your report. It holds the last 20 Frontier battles:
+  their battle messages, what the app read from each one, and which sets it showed and why. Wild battles, hordes and
+  battles against other players are never kept, and player names (yours, a Co-op partner's) are replaced with
+  `<player>`. No chat, no folder paths. The app keeps it in its own data folder and never sends it anywhere.
 - Tower and Factory still come from the switch at the top: the log doesn't say which facility you're in.
 - Everything stays clickable, so you can still fix anything by hand.
 
@@ -134,6 +143,8 @@ engine built into Windows and shows `src/index.html`. All the features are in th
   Set *contents* change on the site nightly; the app never needs a new version for data changes.
 - **Auto mode:** `src-tauri/src/chatlog.rs` reads the newest `chat_*.log` from where it left off and passes on only
   `[Battle]` lines; `src/battlelog.js` turns them into events (challenge, sent out, foe move, won, lost).
+  `src/debuglog.js` keeps the last 20 Frontier battles for the debug log (`src-tauri/src/debuglog.rs` stores it in the
+  app's data folder and saves the copy to send). `node scripts/test.js` checks the parser and the debug log's privacy rules.
 - **OBS:** the app runs a tiny web server on `127.0.0.1` only (`src-tauri/src/obs.rs`, ports 7373–7377) that serves
   the same page with `?view=display`. The app window sends its state there after every change; the OBS page polls it.
 - **Building:** the [Build workflow](.github/workflows/build.yml) builds the installer on GitHub for every push and

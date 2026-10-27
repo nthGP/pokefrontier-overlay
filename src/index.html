@@ -509,6 +509,7 @@
 </div>
 
 <script src="battlelog.js"></script>
+<script src="debuglog.js"></script>
 <script src="calc.js"></script>
 <script>
 // ============================================================
@@ -830,19 +831,22 @@ function sameMove(used, onSet) {
 // "maybe" if a revealed move could still be in one of its unscouted slots.
 // Auto mode also rules sets out by what the log showed or didn't (see BattleLog.tracker):
 // the ability seen, abilities that would have announced themselves, Choice items, Orbs.
-function setFit(set, pick) {
-    if ((pick.excluded || []).includes(set.set_id)) return 'out';
+function setFit(set, pick) { return setFitWhy(set, pick)[0]; }
+// The same, with the reason (shown in the debug log)
+function setFitWhy(set, pick) {
+    if ((pick.excluded || []).includes(set.set_id)) return ['out', 'ruled out by hand'];
     const revealed = pick.revealed || [];
     // A seen item rules out sets known to hold something else (and sets with no scouted item stay possible)
-    if (pick.item && set.item && norm(set.item) !== norm(pick.item)) return 'out';
-    if (set.item && (pick.noItem || []).some(i => norm(i) === norm(set.item))) return 'out';
-    if (pick.ability && set.ability && norm(set.ability) !== norm(pick.ability)) return 'out';
-    if (set.ability && (pick.noAbility || []).some(a => norm(a) === norm(set.ability))) return 'out';
-    if (!revealed.length) return '';
+    if (pick.item && set.item && norm(set.item) !== norm(pick.item)) return ['out', `holds ${set.item}, log showed ${pick.item}`];
+    if (set.item && (pick.noItem || []).some(i => norm(i) === norm(set.item))) return ['out', `log ruled out ${set.item}`];
+    if (pick.ability && set.ability && norm(set.ability) !== norm(pick.ability)) return ['out', `has ${set.ability}, log showed ${pick.ability}`];
+    if (set.ability && (pick.noAbility || []).some(a => norm(a) === norm(set.ability))) return ['out', `log ruled out ${set.ability}`];
+    if (!revealed.length) return ['', ''];
     const known = set.moves.filter(m => m && m.trim());
     const missing = revealed.filter(m => !known.some(k => sameMove(m, k)));
-    if (!missing.length) return '';
-    return missing.length <= 4 - known.length ? 'maybe' : 'out';
+    if (!missing.length) return ['', ''];
+    return missing.length <= 4 - known.length ? ['maybe', `${missing.join(', ')} would be an unscouted slot`]
+                                              : ['out', `doesn't have ${missing.join(', ')}`];
 }
 
 function renderSet(c, pick, idx) {
@@ -1026,6 +1030,8 @@ function render() {
 function commit(changes) {
     Object.assign(state, changes || {});
     state.picks = state.picks.slice(0, slotCount());
+    // A change made by hand during a recorded battle (auto mode's own changes are logged with their event)
+    if (debugRec && !auto.applying && debugRec.active()) debugRec.manual(debugSnapshot());
     try { localStorage.setItem('overlayState', JSON.stringify(state)); } catch (e) {}
     render();
     broadcast();
@@ -1808,7 +1814,86 @@ function applyChrome() {
 // Auto mode: the app follows PokeMMO's chat log and fills in the opponent by itself.
 // The Rust side (chatlog.rs) only passes on [Battle] lines; battlelog.js turns them into events.
 // ============================================================
-const auto = { file: null, offset: 0, inBattle: false, timer: null, status: '', error: false, battle: null, busy: false, push: null };
+const auto = { file: null, offset: 0, inBattle: false, timer: null, status: '', error: false, battle: null, busy: false, push: null, applying: false };
+
+// ------------------------------------------------------------
+// Debug log (src/debuglog.js): what auto mode read and decided in the last 20 Frontier battles, for a user to
+// save and send when it got something wrong. Kept in the app's data folder between runs; never sent anywhere.
+// ------------------------------------------------------------
+var debugRec = null;   // var: commit() can run before this line
+const DEBUG_MAX = 20;
+async function startDebugLog() {
+    if (debugRec || !TAURI || DISPLAY) return;
+    let saved = null;
+    try { saved = JSON.parse(await TAURI.core.invoke('debug_log_load') || 'null'); } catch (e) {}
+    debugRec = DebugLog.recorder({
+        max: DEBUG_MAX,
+        load: () => saved,
+        save: battles => { TAURI.core.invoke('debug_log_save', { contents: JSON.stringify(battles) }).catch(e => console.warn('Debug log not saved:', e)); },
+        unreadOf: debugUnread,
+    });
+}
+// What the overlay shows right now: trainer, and per Pokémon what the log taught it and how each set fits
+function debugSnapshot() {
+    return {
+        trainer: state.trainerId, trainer2: isPair() ? state.trainerId2 : undefined, format: state.format,
+        picks: state.picks.map(p => ({
+            species: p.species, revealed: p.revealed && p.revealed.length ? p.revealed : undefined,
+            item: p.item || undefined, ability: p.ability || undefined,
+            noItem: p.noItem && p.noItem.length ? p.noItem : undefined, noAbility: p.noAbility && p.noAbility.length ? p.noAbility : undefined,
+            excluded: p.excluded && p.excluded.length ? p.excluded : undefined, locked: p.locked != null ? p.locked : undefined,
+            sets: candidates(p.species).map(c => {
+                if (c.unidentified) return 'unidentified 31 IV set';
+                if (c.missing) return `#${c.missing}: not in the sheet`;
+                const [fit, why] = setFitWhy(c.set, p);
+                return `#${c.set.set_id}${c.possible ? ' (possible)' : ''}: ${fit || 'fits'}${why ? ' (' + why + ')' : ''}`;
+            }),
+        })),
+    };
+}
+function debugStart(e, replay) {
+    if (!debugRec || !e.trainers.some(t => t.index != null)) return;
+    debugRec.start({
+        trainers: e.trainers.map(t => ({ name: t.name, index: t.index })),
+        // The log shows the number, or the app found the trainer by class and name
+        matchedBy: e.trainers.map(t => t.index == null ? 'not found' : t.byName ? 'class and name' : 'number in the log'),
+        facility: state.facility, format: state.format, level: state.level,
+        caughtUp: replay || undefined,      // read when auto mode started, mid-battle
+    });
+}
+function debugStep(raw, e, facts) {
+    if (debugRec) debugRec.step(raw, e, facts, e ? debugSnapshot() : null);
+}
+// Battle messages the parser got nothing from that look like they matter (a move used, a foe's item): where a
+// "move not picked up" shows
+function debugUnread(lines) {
+    const out = [];
+    for (const m of BattleLog.messages(lines || [])) {
+        if (!/ used /.test(m) && !(/[\ua000-\ua4cf]/.test(m) && /foe/i.test(m))) continue;
+        if (!BattleLog.parse(['[01/01/00 0:00:00] [Battle] ' + m]).length) out.push(m);
+    }
+    return out;
+}
+async function saveDebugLog() {
+    const box = document.getElementById('debugStatus');
+    const say = (t, err) => { if (box) { box.textContent = t; box.classList.toggle('err', !!err); } };
+    if (!debugRec) return say('Auto mode needs to run once first.', true);
+    try {
+        debugRec.flush();
+        const file = debugRec.file({
+            app: await TAURI.app.getVersion().catch(() => '?'),
+            data: { ...dataStatus }, sets: sets.length, trainers: trainers.length,
+            settings: { facility: state.facility, format: state.format, level: state.level, autoOn: state.auto.on, countStreak: state.auto.streak },
+            logFile: auto.file,       // the log's file name (chat_dd-mm-yy.log), never its folder
+        });
+        const d = new Date(), z = n => String(n).padStart(2, '0');
+        const name = `frontier-overlay-debug-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.json`;
+        const where = await TAURI.core.invoke('debug_log_export', { contents: JSON.stringify(file, null, 1), name });
+        say(`Saved ${file.battles.length} battle${file.battles.length === 1 ? '' : 's'} to ${where}`);
+    } catch (e) {
+        say("Couldn't save the debug log: " + (e && e.message || e), true);
+    }
+}
 
 // Log name ("Gulpin", "Nidoran♀") -> the name the set data uses
 function dataSpecies(name) {
@@ -1835,7 +1920,7 @@ function resolveLogEvent(e) {
     if (e.type === 'challenge' && e.trainers.some(t => t.index == null)) {
         const opp = e.trainers.map(t => {
             const tr = t.index != null ? null : trainerByLogName(t.name);
-            return { name: t.name, index: t.index != null ? t.index : tr ? trainerNo(tr) : null };
+            return { name: t.name, index: t.index != null ? t.index : tr ? trainerNo(tr) : null, byName: t.index == null || undefined };
         });
         // A challenger that isn't a Frontier trainer (an overworld battle): leave the overlay alone
         if (!opp.some(o => o.index != null)) { auto.battle = null; return null; }
@@ -1895,52 +1980,19 @@ function applyBattleEvents(events, replay) {
     let changed = false;
     const results = [];
     if (!auto.tracker) auto.tracker = newTracker();
-    for (const raw of events) {
-        const e = resolveLogEvent(raw);
-        if (!e) continue;
-        if (applyFacts(auto.tracker.event(e))) changed = true;
-        if (['mySentOut', 'boost', 'clearBoosts'].includes(e.type)) { calcFollow(e); changed = true; continue; }
-        if (e.type === 'challenge') {
-            const opp = e.trainers || [{ name: e.trainer, index: e.index }];
-            auto.battle = { index: e.index, trainer: opp.map(o => o.name).join(' & '), indexes: opp.map(o => o.index), names: opp.map(o => o.name), started: false };
-            if (usesTrainers()) {
-                const ts = opp.map(o => trainers.find(x => trainerNo(x) === o.index)).filter(Boolean);
-                if (ts[0]) { state.trainerId = ts[0].id; state.trainerId2 = ts[1] ? ts[1].id : null; }
-                // Two trainers at once is Multi or Co-op (which one only you know: keep it if it's already set)
-                if (opp.length > 1 && !isPair()) state.format = state.facility === 'tower' ? 'multi' : 'doubles';
-            }
-            state.picks = [];
-            changed = true;
-        } else if (e.type === 'foeSentOut') {
-            // Only the trainers who challenged you (in Multi your NPC partner also "sends out")
-            if (auto.battle && auto.battle.indexes && !auto.battle.indexes.includes(e.index)) continue;
-            if (auto.battle && !auto.battle.started) {
-                // The first send-out shows the format: two Pokémon at once is doubles
-                auto.battle.started = true;
-                if (!isPair()) state.format = e.species.length > 1 ? 'doubles' : 'singles';
-            }
-            for (const name of e.species) {
-                const species = dataSpecies(name);
-                if (state.picks.some(p => p.species === species)) continue;
-                if (state.picks.length >= slotCount()) state.picks.shift();
-                state.picks.push({ species, locked: null, revealed: [] });
-            }
-            calcFollow(e);
-            changed = true;
-        } else if (e.type === 'foeMove') {
-            if (/^struggle$/i.test(e.move)) continue;
-            const pick = state.picks.find(p => norm(p.species) === norm(e.species));
-            if (pick && !pick.revealed.some(m => moveKey(m) === moveKey(e.move))) { pick.revealed.push(e.move); changed = true; }
-        } else if (e.type === 'foeItem') {
-            const pick = state.picks.find(p => norm(p.species) === norm(e.species));
-            // Only items some set actually holds (the game's names can differ, e.g. Covert Mantle)
-            const known = [...setsBySpecies.values()].flat().map(x => x.item).find(i => i && norm(i) === norm(e.item));
-            if (pick && known && pick.item !== known) { pick.item = known; changed = true; }
-        } else if (e.type === 'won' || e.type === 'lost') {
-            if (auto.battle) results.push(e.type);
-            auto.battle = null;
+    auto.applying = true;
+    try {
+        for (const raw of events) {
+            const e = resolveLogEvent(raw);
+            if (!e) { debugStep(raw, null, null); continue; }
+            const facts = auto.tracker.event(e);
+            if (applyFacts(facts)) changed = true;
+            if (applyEvent(e, results)) changed = true;
+            if (e.type === 'challenge') debugStart(e, replay);
+            debugStep(raw, e, facts);
+            if ((e.type === 'won' || e.type === 'lost') && debugRec) debugRec.end(e.type);
         }
-    }
+    } finally { auto.applying = false; }
     const result = results.length ? results[results.length - 1] : null;
     if (results.length && !replay && state.auto.streak) {
         let streak = currentRecord().streak;
@@ -1950,6 +2002,53 @@ function applyBattleEvents(events, replay) {
     }
     if (changed) commit();
     return result;
+}
+
+// One event's effect on the overlay. Returns whether anything changed.
+function applyEvent(e, results) {
+    let changed = false;
+    if (['mySentOut', 'boost', 'clearBoosts'].includes(e.type)) { calcFollow(e); return true; }
+    if (e.type === 'challenge') {
+        const opp = e.trainers || [{ name: e.trainer, index: e.index }];
+        auto.battle = { index: e.index, trainer: opp.map(o => o.name).join(' & '), indexes: opp.map(o => o.index), names: opp.map(o => o.name), started: false };
+        if (usesTrainers()) {
+            const ts = opp.map(o => trainers.find(x => trainerNo(x) === o.index)).filter(Boolean);
+            if (ts[0]) { state.trainerId = ts[0].id; state.trainerId2 = ts[1] ? ts[1].id : null; }
+            // Two trainers at once is Multi or Co-op (which one only you know: keep it if it's already set)
+            if (opp.length > 1 && !isPair()) state.format = state.facility === 'tower' ? 'multi' : 'doubles';
+        }
+        state.picks = [];
+        changed = true;
+    } else if (e.type === 'foeSentOut') {
+        // Only the trainers who challenged you (in Multi your NPC partner also "sends out")
+        if (auto.battle && auto.battle.indexes && !auto.battle.indexes.includes(e.index)) return false;
+        if (auto.battle && !auto.battle.started) {
+            // The first send-out shows the format: two Pokémon at once is doubles
+            auto.battle.started = true;
+            if (!isPair()) state.format = e.species.length > 1 ? 'doubles' : 'singles';
+        }
+        for (const name of e.species) {
+            const species = dataSpecies(name);
+            if (state.picks.some(p => p.species === species)) continue;
+            if (state.picks.length >= slotCount()) state.picks.shift();
+            state.picks.push({ species, locked: null, revealed: [] });
+        }
+        calcFollow(e);
+        changed = true;
+    } else if (e.type === 'foeMove') {
+        if (/^struggle$/i.test(e.move)) return false;
+        const pick = state.picks.find(p => norm(p.species) === norm(e.species));
+        if (pick && !pick.revealed.some(m => moveKey(m) === moveKey(e.move))) { pick.revealed.push(e.move); changed = true; }
+    } else if (e.type === 'foeItem') {
+        const pick = state.picks.find(p => norm(p.species) === norm(e.species));
+        // Only items some set actually holds (the game's names can differ, e.g. Covert Mantle)
+        const known = [...setsBySpecies.values()].flat().map(x => x.item).find(i => i && norm(i) === norm(e.item));
+        if (pick && known && pick.item !== known) { pick.item = known; changed = true; }
+    } else if (e.type === 'won' || e.type === 'lost') {
+        if (auto.battle) results.push(e.type);
+        auto.battle = null;
+    }
+    return changed;
 }
 
 async function pollAuto() {
@@ -1963,6 +2062,12 @@ async function pollAuto() {
             auto.file = chunk.file; auto.offset = chunk.offset; auto.inBattle = chunk.in_battle;
             lines = lines.concat(chunk.lines);
         } while (chunk.more);
+        if (debugRec) {
+            // Starting up, only the latest battle is replayed (see below), so only its lines are recorded
+            let from = 0;
+            if (first) { from = lines.length; for (let i = lines.length - 1; i >= 0; i--) if (/\] \[Battle\] You are challenged by /.test(lines[i])) { from = i; break; } }
+            debugRec.lines(lines.slice(from));
+        }
         let events;
         if (first) {
             // A message cut off at its wrap waits in the reader for its second line
@@ -1978,6 +2083,7 @@ async function pollAuto() {
             const result = applyBattleEvents(events, false);
             if (result) auto.lastResult = result;
         }
+        if (debugRec && Date.now() - (auto.flushed || 0) > 10000) { auto.flushed = Date.now(); debugRec.flush(); }
         const b = auto.battle;
         autoStatus(`Following ${auto.file}` + (b ? ` · battling ${b.trainer} #${b.index}` : ' · waiting for a battle'));
     } catch (e) {
@@ -1993,6 +2099,7 @@ async function pollAuto() {
 
 async function startAuto() {
     if (!TAURI) return;
+    await startDebugLog();
     document.getElementById('autoBtn').classList.remove('hidden');
     document.getElementById('autoBtn').onclick = openAutoDialog;
     if (!state.auto.dir) {
@@ -2005,6 +2112,8 @@ async function startAuto() {
 
 function restartAuto() {
     clearInterval(auto.timer);
+    // A battle being recorded is read again from the log as a new record
+    if (debugRec) debugRec.end('auto mode restarted');
     auto.file = null; auto.offset = 0; auto.inBattle = false; auto.battle = null;
     if (!state.auto.on) { autoStatus('Off'); return; }
     autoStatus('Starting…');
@@ -2024,6 +2133,10 @@ function openAutoDialog() {
         <label class="row"><input type="checkbox" id="autoStreak"${a.streak ? ' checked' : ''}><span class="grow">Count wins and losses on the streak</span></label>
         <div class="auto-status" id="autoStatus"></div>
         <div class="hint">Only battle messages are read. Team, whisper and global chat are skipped by the app and never shown, saved or sent anywhere.</div>
+        <div class="row"><span class="grow hint">Something went wrong? <b>Save debug log</b> keeps what auto mode read and decided in your last ${DEBUG_MAX}
+            Frontier battles (battle messages only, player names removed) in a file you can send with your report.</span>
+            <button class="btn" id="debugSave">Save debug log</button></div>
+        <div class="auto-status" id="debugStatus"></div>
     </div></div>`;
     autoStatus(auto.status, auto.error);
     const back = document.getElementById('dlgBack');
@@ -2038,6 +2151,7 @@ function openAutoDialog() {
     document.getElementById('autoOn').onchange = () => save(true);
     document.getElementById('autoDir').onchange = () => save(true);
     document.getElementById('autoStreak').onchange = () => save(false);
+    document.getElementById('debugSave').onclick = saveDebugLog;
     document.getElementById('autoFind').onclick = async () => {
         const guess = await TAURI.core.invoke('guess_chat_log_dir').catch(() => null);
         if (guess) { document.getElementById('autoDir').value = guess; save(true); }
