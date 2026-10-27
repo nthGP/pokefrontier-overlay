@@ -1889,8 +1889,11 @@ function autoStatus(text, error = false) {
 
 // Applies log events to the overlay. replay: catching up on a battle already under way when auto mode
 // started, so wins and losses from before aren't counted again.
+// Every win/loss in the batch counts, in order: one read of the log can hold the end of one battle and the start
+// of the next (or several battles, when the game writes its log in a block or the hidden window polls rarely).
 function applyBattleEvents(events, replay) {
-    let changed = false, result = null;
+    let changed = false;
+    const results = [];
     if (!auto.tracker) auto.tracker = newTracker();
     for (const raw of events) {
         const e = resolveLogEvent(raw);
@@ -1907,7 +1910,6 @@ function applyBattleEvents(events, replay) {
                 if (opp.length > 1 && !isPair()) state.format = state.facility === 'tower' ? 'multi' : 'doubles';
             }
             state.picks = [];
-            result = null;
             changed = true;
         } else if (e.type === 'foeSentOut') {
             // Only the trainers who challenged you (in Multi your NPC partner also "sends out")
@@ -1935,13 +1937,15 @@ function applyBattleEvents(events, replay) {
             const known = [...setsBySpecies.values()].flat().map(x => x.item).find(i => i && norm(i) === norm(e.item));
             if (pick && known && pick.item !== known) { pick.item = known; changed = true; }
         } else if (e.type === 'won' || e.type === 'lost') {
-            if (auto.battle) result = e.type;
+            if (auto.battle) results.push(e.type);
             auto.battle = null;
         }
     }
-    if (result && !replay && state.auto.streak) {
-        const r = currentRecord();
-        setRecord({ streak: result === 'won' ? r.streak + 1 : 0 });   // commits too
+    const result = results.length ? results[results.length - 1] : null;
+    if (results.length && !replay && state.auto.streak) {
+        let streak = currentRecord().streak;
+        for (const x of results) streak = x === 'won' ? streak + 1 : 0;
+        setRecord({ streak });   // commits too
         return result;
     }
     if (changed) commit();
