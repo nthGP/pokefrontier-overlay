@@ -5,6 +5,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod chatlog;
+mod debuglog;
 mod obs;
 
 use std::sync::Arc;
@@ -56,7 +57,10 @@ fn main() {
             obs::set_overlay_state,
             obs::obs_url,
             chatlog::read_chat_log,
-            chatlog::guess_chat_log_dir
+            chatlog::guess_chat_log_dir,
+            debuglog::debug_log_load,
+            debuglog::debug_log_save,
+            debuglog::debug_log_export
         ])
         .setup(|app| {
             // Local page for OBS (see obs.rs)

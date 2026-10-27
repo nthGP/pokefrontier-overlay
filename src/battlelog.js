@@ -21,12 +21,15 @@
 //   { type: 'boost', foe: true, name: 'Marowak', stats: ['atk'], set: 6 }   (Belly Drum)
 //   { type: 'clearBoosts' }   (Haze)
 //   { type: 'turn', n: 3 }                                   ("Turn 3 started!")
-//   { type: 'myMove', move: 'Toxic' }                        (your side used a move; name can be a nickname)
+//   { type: 'myMove', move: 'Toxic', hits: [{ name: 'Dugtrio', pct: 99 }] }
+//                                                            (your side used a move; name can be a nickname. hits: the
+//                                                            "( Dugtrio -99% )" part, damage as % of the target's max HP)
 //   { type: 'foeWithdrew', index: 245, species: 'Crobat' }
 //   { type: 'foeFainted', species: 'Crobat' }
 //   { type: 'foeStatus', species: 'Tyranitar', status: 'tox' }        (tox / psn / brn / par / slp / frz)
 //   { type: 'foeAbility', species: 'Aerodactyl', ability: 'Pressure' } (species null when the log doesn't name it:
-//                                                                      "Your team's Attack fell!" = Intimidate)
+//                                                                      "Your team's Attack fell!" = Intimidate;
+//                                                                      also Sturdy: "hung on using its Sturdy!")
 //   { type: 'itemNoOwner', item: 'Bug Gem', move: 'Bug Bite' }   ("The Bug Gem strengthened Bug Bite's power!": no owner named)
 (function (root) {
     // "[21/10/26 22:59:01] [Battle] ..." — the clock follows the player's system settings, so it can also be
@@ -68,6 +71,12 @@
                // a tagged name with more text after it: "'s ꀇLum Berry (Status) cured its poison!"
                || m.match(/[\ua000-\ua4cf]([^!()\ua000-\ua4cf]+?)\s*\([^)]*\)/);
         return r ? r[1].trim() : null;
+    }
+
+    // "( Dugtrio -99% )" / "( Poliwhirl -100%, Poliwhirl -100% )" (decimal comma: "-99,2%") -> [{ name, pct }]
+    function damageList(s) {
+        if (!s) return [];
+        return [...s.matchAll(/([^,()]+?)\s+-(\d+(?:[.,]\d+)?)%/g)].map(x => ({ name: monName(x[1]), pct: parseFloat(x[2].replace(',', '.')) }));
     }
 
     function parse(lines) {
@@ -125,13 +134,16 @@
                 events.push({ type: 'foeAbility', species: monName(r[1]), ability: 'Pressure' });
             } else if ((r = m.match(/^The foe's (.+?) traced .+?'s (.+?)!$/))) {
                 events.push({ type: 'foeAbility', species: monName(r[1]), ability: 'Trace' });
+            } else if ((r = m.match(/^The foe's (.+?) hung on using its Sturdy!$/))) {
+                // Same wording as Focus Sash ("hung on using its ꌀFocus Sash"), but an ability, with no item glyph
+                events.push({ type: 'foeAbility', species: monName(r[1]), ability: 'Sturdy' });
             } else if ((r = m.match(/^The foe's (.+?) breaks the mold!$/))) {
                 events.push({ type: 'foeAbility', species: monName(r[1]), ability: 'Mold Breaker' });
             } else if (WEATHER[m]) {
                 // Weather from an ability (no move used): only meaningful right after a send-out, the app checks that
                 events.push({ type: 'weather', ability: WEATHER[m] });
-            } else if ((r = m.match(/^[^\[]+? used (.+?)!(?: \(.*\))?$/)) && !m.startsWith("The foe's ")) {
-                events.push({ type: 'myMove', move: clean(r[1]) });
+            } else if ((r = m.match(/^[^\[]+? used (.+?)!(?: \((.*)\))?$/)) && !m.startsWith("The foe's ")) {
+                events.push({ type: 'myMove', move: clean(r[1]), hits: damageList(r[2]) });
             } else {
                 // Item messages: the item name carries an icon character (private-use glyph) and often a tag: "ꀅLife Orb (ATK)"
                 const it = itemIn(m);
@@ -204,7 +216,9 @@
     //   { species, item }               an item seen without a "The foe's X" message (Gems)
     //   { species, noItem: [...] }      Choice items (two different moves without switching), Orbs (a full turn, no status),
     //                                   Gems (a hit of that type with no Gem text), Lum and the matching status berry
-    //                                   (a status that stayed), Air Balloon (came in without the balloon text)
+    //                                   (a status that stayed), Air Balloon (came in without the balloon text),
+    //                                   Focus Sash (one of our hits took it from full HP to 0 with no "hung on" text)
+    //   { species, noAbility: ['Sturdy'] } the same one-hit KO from full HP
     // Item checks stop for a Pokémon once its item has shown up (a used Gem / Lum / popped Balloon is gone and
     // says nothing the next time) or after our Trick / Knock Off.
     // Entry announcements verified in PokeMMO logs (2026-10): Intimidate ("Your team's Attack fell!"),
@@ -221,6 +235,11 @@
     const VARIABLE_POWER = new Set(['return', 'frustration', 'gyroball', 'lowkick', 'grassknot', 'heavyslam', 'heatcrash',
                                     'electroball', 'flail', 'reversal', 'crushgrip', 'wringout', 'punishment', 'storedpower', 'magnitude']);
     // Status berries that cure one status (Lum cures them all)
+    // Multi-hit moves: the log adds the hits up, so "-100%" from full doesn't mean one hit did it
+    const MULTI_HIT = new Set(['armthrust', 'barrage', 'bonerush', 'bonemerang', 'bulletseed', 'cometpunch', 'doublehit',
+                               'doublekick', 'doubleslap', 'dualchop', 'furyattack', 'furyswipes', 'geargrind', 'iciclespear',
+                               'pinmissile', 'rockblast', 'spikecannon', 'tailslap', 'triplekick', 'twineedle', 'beatup',
+                               'dragondarts', 'scaleshot', 'surgingstrikes', 'tripleaxel', 'watershuriken', 'populationbomb']);
     const STATUS_BERRY = { tox: 'Pecha Berry', psn: 'Pecha Berry', brn: 'Rawst Berry', par: 'Cheri Berry', slp: 'Chesto Berry', frz: 'Aspear Berry' };
 
     function tracker(opts) {
@@ -341,6 +360,16 @@
                     settle(out);
                     closeEntry(out);
                     gemsBefore = [];
+                    // A one-hit KO from full HP ("-100%": the shown damage stops at the HP it had) with no "hung on"
+                    // text: no Focus Sash, no Sturdy. With either, the line would read -99% and "hung on" would follow.
+                    if (!MULTI_HIT.has(key(ev.move))) {
+                        for (const h of ev.hits || []) {
+                            const m = mon(h.name);
+                            if (!m || !m.active || h.pct < 100) continue;
+                            if (itemUnknown(m)) out.push({ species: m.species, noItem: ['Focus Sash'] });
+                            out.push({ species: m.species, noAbility: ['Sturdy'] });
+                        }
+                    }
                     // Our Trick / Knock Off / Thief: the foe's item may have changed, stop guessing about it
                     if (OUR_ITEM_MOVES.has(ev.move)) for (const m of mons.values()) if (m.active) m.swapped = true;
                     lastMove = { foe: false, move: ev.move };
