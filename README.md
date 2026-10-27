@@ -64,6 +64,13 @@ When a new version is out, an **Update** button appears in the top bar.
     If one of your hits takes it from full HP to 0 in one go (the line shows `-100%`) with no "hung on", sets with
     Focus Sash or Sturdy fade (multi-hit moves are skipped: the log adds their hits up). A Mold Breaker attacker
     on your side would wrongly rule out Sturdy; if you use one, check by hand.
+  - **Life Orb:** a hit that shows its damage with no "is hurt by its Life Orb!" after it rules out Life Orb
+    (Seismic Toss-style fixed damage is skipped, and so are species with a Magic Guard or Sheer Force set).
+  - **Leftovers:** a whole end of turn below full HP (it took a hit, Stealth Rock, or poison/burn the turn before)
+    with no "restored a little HP using its Leftovers!" rules out Leftovers (and Black Sludge for Poison types).
+    A heal in between (Recover, Rest, a berry, Shell Bell) resets it, since it might be back at full.
+  - **Natural Cure:** "X was cured of its poisoning." right as it switches out shows Natural Cure (not after Rest,
+    and not a Natural Cure it traced).
   - Once a Pokémon's item has shown up (a Gem used, a Balloon popped) or after your Trick / Knock Off, these item checks
     stop for it, since a used item says nothing the next time.
   - Items seen in the log (Life Orb, Gems, berries, Air Balloon, Focus Sash…) are applied too.
