@@ -309,11 +309,12 @@
         .cc-edited { font-size: 11px; color: var(--warn); }
         .cc-hint { font-size: 11.5px; color: var(--faint); }
         .cc-cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
+        .cc-col { min-width: 0; }
         .cc-col h4 { margin: 0 0 6px; font: 700 15px var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
         .cc-spe { margin-left: 6px; font-size: 12px; color: var(--muted); letter-spacing: .04em; }
-        .cc-list { display: grid; grid-template-columns: minmax(120px, max-content) 1fr; gap: 4px 12px; align-items: center; }
+        .cc-list { display: grid; grid-template-columns: minmax(0, max-content) minmax(max-content, 1fr); gap: 4px 12px; align-items: center; }
         .cc-move { padding: 3px 10px; border-radius: 4px; color: #fff; font: 600 15px var(--font-body); text-align: center; white-space: nowrap;
-            text-shadow: 0 1px 1px rgba(0,0,0,.35); border: 2px solid transparent; }
+            text-shadow: 0 1px 1px rgba(0,0,0,.35); border: 2px solid transparent; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
         .cc-move.unk { background: var(--surface-3); color: var(--faint); text-shadow: none; }
         .cc-move.sel { border-color: var(--ink); box-shadow: 0 0 0 2px var(--accent); }
         body:not(.display) .cc-move:not(.unk) { cursor: pointer; }
@@ -634,8 +635,13 @@ let state = loadState();
 function loadState() {
     try {
         const saved = JSON.parse(localStorage.getItem('overlayState') || 'null');
-        if (saved) return { ...DEFAULT_STATE, ...saved, auto: { ...DEFAULT_STATE.auto, ...(saved.auto || {}) },
-                            calc: { ...DEFAULT_STATE.calc, ...(saved.calc || {}) } };
+        if (saved) {
+            const calc = { ...DEFAULT_STATE.calc, ...(saved.calc || {}) };
+            // Not in a battle: start the calc fresh (also drops changes older versions kept forever)
+            if (!(saved.picks || []).length) Object.assign(calc, { foe: 0, foeSets: {}, boosts: { mine: {}, foe: {} }, hp: { mine: 100, foe: 100 },
+                                                                    sides: { mine: {}, foe: {} }, edits: {}, weather: '', weatherFor: null, sel: null });
+            return { ...DEFAULT_STATE, ...saved, auto: { ...DEFAULT_STATE.auto, ...(saved.auto || {}) }, calc };
+        }
     } catch (e) {}
     return { ...DEFAULT_STATE };
 }
@@ -871,7 +877,7 @@ function renderSet(c, pick, idx) {
         const info = dex.moves[norm(m)];
         const type = info ? info[0] : 'Unknown';
         const rev = pick.revealed.some(r => sameMove(r, m)) ? ' revealed' : '';
-        return `<button class="move t-${type}${rev}" data-move="${esc(m)}" data-slot="${idx}" title="${esc(m)} · ${type}${info && info[2] ? ' · ' + info[2] + ' BP' : ''}">${esc(m)}</button>`;
+        return `<button class="move t-${type}${rev}" data-move="${esc(m)}" data-slot="${idx}" title="${esc(m)} · ${type}${info && info[2] ? ' · ' + info[2] + ' BP' : ''}">${esc(moveLabel(m))}</button>`;
     }).join('');
 
     return `<div class="${cls.join(' ')}" data-set="${s.set_id}" data-slot="${idx}">
@@ -1028,6 +1034,7 @@ function render() {
 // Controls
 // ============================================================
 function commit(changes) {
+    if (changes && Array.isArray(changes.picks) && !changes.picks.length) resetCalcBattle();
     Object.assign(state, changes || {});
     state.picks = state.picks.slice(0, slotCount());
     // A change made by hand during a recorded battle (auto mode's own changes are logged with their event)
@@ -1364,7 +1371,7 @@ function memberCard(m, i) {
         const mv = (m.moves[k] || '').trim();
         if (!mv) return `<span class="move blank">—</span>`;
         const info = dex.moves[norm(mv)];
-        return `<span class="move t-${info ? info[0] : 'Unknown'}" title="${esc(mv)}">${esc(mv)}</span>`;
+        return `<span class="move t-${info ? info[0] : 'Unknown'}" title="${esc(mv)}">${esc(moveLabel(mv))}</span>`;
     }).join('');
     const click = !DISPLAY && state.facility === 'factory' ? ` click" data-rental="${i}" title="Click to swap this rental` : '';
     const inCalc = !DISPLAY && state.showCalc && i === Math.min(state.calc.mine, Math.max(0, resolveTeam().length - 1)) ? ' in-calc' : '';
@@ -2018,6 +2025,7 @@ function applyEvent(e, results) {
             if (opp.length > 1 && !isPair()) state.format = state.facility === 'tower' ? 'multi' : 'doubles';
         }
         state.picks = [];
+        resetCalcBattle();
         changed = true;
     } else if (e.type === 'foeSentOut') {
         // Only the trainers who challenged you (in Multi your NPC partner also "sends out")
@@ -2176,6 +2184,8 @@ const WEATHER_ABILITIES = { drought: 'Sun', drizzle: 'Rain', sandstream: 'Sand',
 const SIDE_FLAGS = [['isReflect', 'Reflect'], ['isLightScreen', 'Light Screen'], ['isSR', 'Stealth Rock'],
                     ['isHelpingHand', 'Helping Hand', true], ['isFriendGuard', 'Friend Guard', true], ['isTailwind', 'Tailwind'], ['isProtected', 'Protect']];
 const cid = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+// Shorter name to show for a move: "Hidden Power Fighting" → "HP Fighting" (the full name stays in the tooltip and the calc)
+const moveLabel = m => String(m || '').replace(/^hidden\s*power\s+(?=\S)/i, 'HP ');
 let calcGenCache = null;
 const calcGen = () => calcGenCache || (window.Calc ? (calcGenCache = window.Calc.Generations.get(5)) : null);
 const calcSpecies = sp => String(sp).replace(/♀/g, '-F').replace(/♂/g, '-M');
@@ -2195,6 +2205,14 @@ function calcSides() {
               || options.find(x => !setFit(x, pick)) || options[0] || null;
     }
     return { team, mine, pick, foeSet, options };
+}
+
+// A new battle starts the calc fresh: no stat changes, full HP, no screens/hazards, no hand-picked weather or set,
+// and every Pokémon back to its set as scouted on the site (or as written in your team). Called whenever the
+// opponent's picks are cleared: a new trainer, a new Factory round, Clear/Esc, or auto mode seeing a challenge.
+function resetCalcBattle() {
+    state.calc = { ...state.calc, foe: 0, foeSets: {}, boosts: { mine: {}, foe: {} }, hp: { mine: 100, foe: 100 },
+                   sides: { mine: {}, foe: {} }, edits: {}, weather: '', weatherFor: null, sel: null };
 }
 
 const editKey = (side, src) => side === 'mine' ? `m:${src.nickname || ''}:${src.species}` : `f:${src.pokemon}-${src.set_id}`;
@@ -2365,7 +2383,7 @@ function calcColumn(side, data, sel) {
         const pct = m.unk ? '<span class="cc-pct dim">?</span>'
                   : m.status ? '<span class="cc-pct dim">—</span>'
                   : `<span class="cc-pct${m.ko ? ' ko' : ''}">${fmtPct(m.lo)} – ${fmtPct(m.hi)}%${tag ? ` <small>${tag}</small>` : ''}</span>`;
-        return `<span class="${cls}" data-cside="${side}" data-ci="${i}">${esc(m.name)}</span>${pct}`;
+        return `<span class="${cls}" data-cside="${side}" data-ci="${i}" title="${esc(m.name)}">${esc(moveLabel(m.name))}</span>${pct}`;
     }).join('');
     const faster = data.spe != null ? `<span class="cc-spe">${data.spe} Spe</span>` : '';
     return `<div class="cc-col"><h4>${esc(data.name)}'s moves ${faster}</h4><div class="cc-list">${rows}</div></div>`;
