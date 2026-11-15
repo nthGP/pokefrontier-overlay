@@ -90,6 +90,25 @@ test('cured as it switches out: Natural Cure (not after Rest, not a traced one)'
     assert(!run(traced).some(x => x.ability === 'Natural Cure'));
 });
 
+// Some players' logs print item names with no icon glyph and no "(Status)" tag (reported 2026-10-27)
+const PM = (t, msg) => `[27/10/26 ${t} pm] [Battle] ${msg}`;
+test('item texts without the icon glyph: Lum Berry, Chesto, Gems, resist berries, Orbs', () => {
+    const one = msg => B.parse([PM('11:44:53', msg)]);
+    assert.deepStrictEqual(one("The foe's [#ff8a00]Machamp[#]'s [#ff8a00]Lum Berry[#] cured its poison!"), [{ type: 'foeItem', species: 'Machamp', item: 'Lum Berry' }]);
+    assert.deepStrictEqual(one("The foe's [#ff8a00]Wailord[#]'s [#ff8a00]Chesto Berry[#] woke it up!"), [{ type: 'foeItem', species: 'Wailord', item: 'Chesto Berry' }]);
+    assert.deepStrictEqual(one("The [#ff8a00]Bug Gem[#] strengthened [#ff8a00]Bug Bite[#]'s power!"), [{ type: 'itemNoOwner', item: 'Bug Gem', move: 'Bug Bite' }]);
+    assert.deepStrictEqual(one("The [#ff8a00]Chople Berry[#] weakened the damage to the foe's [#ff8a00]Blissey[#]!"), [{ type: 'foeItem', species: 'Blissey', item: 'Chople Berry' }]);
+    assert.deepStrictEqual(one("The foe's [#ff8a00]Ursaring[#] was burned by the [#ff8a00]Flame Orb[#]!")[0], { type: 'foeItem', species: 'Ursaring', item: 'Flame Orb' });
+    assert.deepStrictEqual(one("The foe's [#ff8a00]Gengar[#]'s Cursed Body disabled Earthquake!"), []);   // an ability, not an item
+});
+test('a glyph-less Lum Berry cure no longer rules Lum Berry out', () => {
+    const f = run([PM('11:44:50', 'You are challenged by Picnicker MELODY[208]!'), PM('11:44:51', 'Picnicker MELODY[208] sent out Machamp!'),
+                   PM('11:44:52', 'Turn 1 started!'), PM('11:44:52', 'Alpha Slowking used Toxic!'),
+                   PM('11:44:53', "The foe's [#ff8a00]Machamp[#] was badly poisoned!"),
+                   PM('11:44:53', "The foe's [#ff8a00]Machamp[#]'s [#ff8a00]Lum Berry[#] cured its poison!"), PM('11:44:54', 'Turn 2 started!')]);
+    assert(!f.some(x => (x.noItem || []).includes('Lum Berry')));
+});
+
 // ---------------------------------------------------------------- debug log
 const NAME = 'Nithyyy';
 function battle(t, idx, extra = []) {

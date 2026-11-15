@@ -85,6 +85,19 @@
         return [...s.matchAll(/([^,()]+?)\s+-(\d+(?:[.,]\d+)?)%/g)].map(x => ({ name: monName(x[1]), pct: parseFloat(x[2].replace(',', '.')) }));
     }
 
+    // The same item texts without the icon glyph, as some players' logs show them (reported 2026-10-27):
+    //   "The foe's Machamp's Lum Berry cured its poison!"   "The Bug Gem strengthened Bug Bite's power!"
+    //   "The Chople Berry weakened the damage to the foe's Blissey!"   "was burned by the Flame Orb!"
+    // Only names that look like an item (Berry, Gem, Herb, Orb...): the app also ignores items no set holds.
+    const ITEMISH = /^[A-Z][A-Za-z.' -]*?(?:Berry|Herb|Orb|Gem|Sash|Band|Balloon|Sludge|Bell|Leftovers|Helmet|Card|Bulb|Battery|Snowball|Button|Policy|Juice|Seed|Lens|Plate|Incense|Clay|Rock|Root|Claw|Specs|Scarf)$/;
+    function plainItem(m) {
+        let r;
+        if ((r = m.match(/^The foe's .+?'s (.+?) (?:cured|woke|restored|raised|weakened|healed|sharply|boosted|activated|made|let|became|was|is)\b/)) && ITEMISH.test(r[1])) return r[1];
+        if ((r = m.match(/^The (.+?) (?:strengthened|weakened) /)) && ITEMISH.test(r[1])) return r[1];
+        if ((r = m.match(/^The foe's .+? (?:was|is) \w+(?: \w+)? by (?:the |its )?(.+?)!$/)) && ITEMISH.test(r[1])) return r[1];
+        return null;
+    }
+
     function parse(lines) {
         const events = [];
         for (const m of messages(lines)) {
@@ -160,7 +173,7 @@
                 events.push({ type: 'myMove', move: clean(r[1]), hits: damageList(r[2]) });
             } else {
                 // Item messages: the item name carries an icon character (private-use glyph) and often a tag: "ꀅLife Orb (ATK)"
-                const it = itemIn(m);
+                const it = itemIn(m) || plainItem(m);
                 if (!it && (r = m.match(/^The foe's (.+?)(?:'s (.+?) popped| (?:is|was|restored|ate|consumed|held|became|floats|hung).* its (.+?))!$/))) {
                     // Some item texts come without the icon glyph ("floats in the air with its Air Balloon!")
                     const item = (r[2] || r[3]).replace(/[^\x20-\x7e\u00c0-\u024f]/g, '').replace(/\s*\([A-Z]+\)\s*$/, '').trim();
