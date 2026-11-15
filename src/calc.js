@@ -20405,6 +20405,9 @@ function calculateBPModsBWXY(gen, attacker, defender, move, field, desc, basePow
     else if ((attacker.hasItem('Adamant Orb') &&
         attacker.named('Dialga') &&
         move.hasType('Steel', 'Dragon')) ||
+        (attacker.hasItem('Soul Dew') &&
+            attacker.named('Latios', 'Latias') &&
+            move.hasType('Psychic', 'Dragon')) ||
         (attacker.hasItem('Lustrous Orb') &&
             attacker.named('Palkia') &&
             move.hasType('Water', 'Dragon')) ||
@@ -20577,10 +20580,7 @@ function calculateAtModsBWXY(attacker, defender, move, field, desc) {
         atMods.push(8192);
         desc.attackerItem = attacker.item;
     }
-    else if ((attacker.hasItem('Soul Dew') &&
-        attacker.named('Latios', 'Latias', 'Latios-Mega', 'Latias-Mega') &&
-        move.category === 'Special') ||
-        (attacker.hasItem('Choice Band') && move.category === 'Physical') ||
+    else if ((attacker.hasItem('Choice Band') && move.category === 'Physical') ||
         (attacker.hasItem('Choice Specs') && move.category === 'Special')) {
         atMods.push(6144);
         desc.attackerItem = attacker.item;
@@ -20647,9 +20647,7 @@ function calculateDfModsBWXY(gen, defender, field, desc, hitsPhysical) {
         dfMods.push(6144);
         desc.defenderAbility = defender.ability;
     }
-    if ((!hitsPhysical && defender.hasItem('Soul Dew') &&
-        defender.named('Latios', 'Latias', 'Latios-Mega', 'Latias-Mega')) ||
-        (defender.hasItem('Eviolite') && ((_a = gen.species.get((0, util_1.toID)(defender.name))) === null || _a === void 0 ? void 0 : _a.nfe)) ||
+    if ((defender.hasItem('Eviolite') && ((_a = gen.species.get((0, util_1.toID)(defender.name))) === null || _a === void 0 ? void 0 : _a.nfe)) ||
         (!hitsPhysical && defender.hasItem('Assault Vest'))) {
         dfMods.push(6144);
         desc.defenderItem = defender.item;
