@@ -29,5 +29,33 @@ function load(p) {
 for p, src in sorted(mods.items()):
     parts.append("defs[%s] = function (require, module, exports) {\n%s\n};\n" % (json.dumps(p), src))
 parts.append("window.Calc = load('index');\nwindow.Calc.getFinalSpeed = load('mechanics/util').getFinalSpeed;\n})();\n")
-open(out, 'w', encoding='utf-8').write(''.join(parts))
+bundle = ''.join(parts)
+
+# PokeMMO differences from the Gen 5 engine, applied to the bundle (each must match exactly once).
+PATCHES = [
+    # Soul Dew works like Gen 7+: Latios/Latias get 1.2x on Psychic and Dragon moves, no SpA/SpD boost.
+    ("""    else if ((attacker.hasItem('Adamant Orb') &&
+        attacker.named('Dialga') &&
+        move.hasType('Steel', 'Dragon')) ||""",
+     """    else if ((attacker.hasItem('Adamant Orb') &&
+        attacker.named('Dialga') &&
+        move.hasType('Steel', 'Dragon')) ||
+        (attacker.hasItem('Soul Dew') &&
+            attacker.named('Latios', 'Latias') &&
+            move.hasType('Psychic', 'Dragon')) ||"""),
+    ("""    else if ((attacker.hasItem('Soul Dew') &&
+        attacker.named('Latios', 'Latias', 'Latios-Mega', 'Latias-Mega') &&
+        move.category === 'Special') ||
+        (attacker.hasItem('Choice Band') && move.category === 'Physical') ||""",
+     """    else if ((attacker.hasItem('Choice Band') && move.category === 'Physical') ||"""),
+    ("""    if ((!hitsPhysical && defender.hasItem('Soul Dew') &&
+        defender.named('Latios', 'Latias', 'Latios-Mega', 'Latias-Mega')) ||
+        (defender.hasItem('Eviolite')""",
+     """    if ((defender.hasItem('Eviolite')"""),
+]
+for old, new in PATCHES:
+    assert bundle.count(old) == 1, 'PokeMMO patch no longer matches: ' + old.splitlines()[0]
+    bundle = bundle.replace(old, new)
+
+open(out, 'w', encoding='utf-8').write(bundle)
 print(len(mods), 'modules', os.path.getsize(out), 'bytes')

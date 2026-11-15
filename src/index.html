@@ -310,8 +310,16 @@
         .cc-hint { font-size: 11.5px; color: var(--faint); }
         .cc-cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
         .cc-col { min-width: 0; }
-        .cc-col h4 { margin: 0 0 6px; font: 700 15px var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
-        .cc-spe { margin-left: 6px; font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+        .cc-col h4 { margin: 0 0 6px; font: 700 15px var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); 
+            display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+        .cc-col h4 > .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        .spd { white-space: nowrap; }
+        .spd { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line);
+            font: 700 12.5px var(--font-display); letter-spacing: .06em; color: var(--muted); font-variant-numeric: tabular-nums; }
+        .spd svg { width: 11px; height: 11px; }
+        .spd small { font-size: 11px; font-weight: 600; opacity: .8; }
+        .spd.first { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+        .spd.tie { background: var(--warn); border-color: var(--warn); color: #1a1405; }
         .cc-list { display: grid; grid-template-columns: minmax(0, max-content) minmax(max-content, 1fr); gap: 4px 12px; align-items: center; }
         .cc-move { padding: 3px 10px; border-radius: 4px; color: #fff; font: 600 15px var(--font-body); text-align: center; white-space: nowrap;
             text-shadow: 0 1px 1px rgba(0,0,0,.35); border: 2px solid transparent; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -2357,8 +2365,8 @@ function calcRun() {
         return {
             sides, sm, sf, A, B, speA, speB,
             view: {
-                mine: { name: mine.species, moves: mineMoves, spe: speA },
-                foe: { name: foeSet.pokemon, moves: foeMoves, spe: speB },
+                mine: { name: mine.species, moves: mineMoves, spe: speA, rawSpe: A.stats.spe, speStage: ((c.boosts || {}).mine || {}).spe || 0 },
+                foe: { name: foeSet.pokemon, moves: foeMoves, spe: speB, rawSpe: B.stats.spe, speStage: ((c.boosts || {}).foe || {}).spe || 0 },
                 sel, desc: s && s.desc || '', rolls: s && s.rolls || [], notes: [...new Set(notes)],
             },
         };
@@ -2376,7 +2384,19 @@ function calcView() {
 
 const fmtPct = v => (Math.round(v * 10) / 10).toFixed(1);
 
-function calcColumn(side, data, sel) {
+// Speed pill: the final speed (boosts, Scarf, paralysis, Tailwind... included) and who moves first
+const SPD_BOLT = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M7 0 1 7h4l-1 5 6-7H6z" fill="currentColor"/></svg>';
+function speedPill(data, otherSpe) {
+    if (data.spe == null) return '';
+    const order = otherSpe == null ? '' : data.spe > otherSpe ? 'first' : data.spe < otherSpe ? 'second' : 'tie';
+    const word = { first: 'First', second: 'Second', tie: 'Tie' }[order];
+    const changed = data.rawSpe != null && data.rawSpe !== data.spe;
+    const stage = data.speStage ? ` · ${data.speStage > 0 ? '+' : ''}${data.speStage}` : '';
+    const num = changed ? `${data.rawSpe} <small>→</small> ${data.spe}<small>${stage}</small>` : `${data.spe}`;
+    return `<span class="spd ${order}" title="Final speed${changed ? ` (stat ${data.rawSpe})` : ''}">${order === 'first' ? SPD_BOLT : ''}${num}${word ? ` · ${word}` : ''}</span>`;
+}
+
+function calcColumn(side, data, sel, otherSpe) {
     const rows = data.moves.map((m, i) => {
         const cls = ['cc-move', m.unk ? 'unk' : 't-' + (m.type || 'Unknown'), sel && sel.side === side && sel.i === i ? 'sel' : ''].join(' ');
         const tag = [m.multi ? `×${m.hits}` : '', m.crit ? 'crit' : ''].filter(Boolean).join(' ');
@@ -2385,14 +2405,13 @@ function calcColumn(side, data, sel) {
                   : `<span class="cc-pct${m.ko ? ' ko' : ''}">${fmtPct(m.lo)} – ${fmtPct(m.hi)}%${tag ? ` <small>${tag}</small>` : ''}</span>`;
         return `<span class="${cls}" data-cside="${side}" data-ci="${i}" title="${esc(m.name)}">${esc(moveLabel(m.name))}</span>${pct}`;
     }).join('');
-    const faster = data.spe != null ? `<span class="cc-spe">${data.spe} Spe</span>` : '';
-    return `<div class="cc-col"><h4>${esc(data.name)}'s moves ${faster}</h4><div class="cc-list">${rows}</div></div>`;
+    return `<div class="cc-col"><h4><span class="nm">${esc(data.name)}'s moves</span>${speedPill(data, otherSpe)}</h4><div class="cc-list">${rows}</div></div>`;
 }
 
 function calcResults(view) {
     if (!view) return `<div class="cc-empty">The calc isn't available.</div>`;
     if (view.empty) return DISPLAY ? '' : `<div class="cc-empty">${esc(view.empty)}</div>`;
-    return `<div class="cc-cols">${calcColumn('mine', view.mine, view.sel)}${calcColumn('foe', view.foe, view.sel)}</div>
+    return `<div class="cc-cols">${calcColumn('mine', view.mine, view.sel, view.foe.spe)}${calcColumn('foe', view.foe, view.sel, view.mine.spe)}</div>
         ${view.desc ? `<div><div class="cc-head">${esc(view.desc)}</div>
         ${view.rolls.length ? `<div class="cc-rolls">Possible damage amounts: (${view.rolls.join(', ')})</div>` : ''}</div>` : ''}`;
 }
