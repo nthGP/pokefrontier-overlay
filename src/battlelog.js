@@ -510,7 +510,7 @@
     // but some players' logs don't (Shamandara's doubles log, 2026-11-16: "Golduck used Scald! ( Saq3bi -44.1% )"),
     // so the parser can't tell them from ours. This remembers the names each side sent out in the current battle and
     // turns a myMove by a foe's Pokémon into a foeMove. Feed it every event in order, after sentOut is resolved to
-    // foeSentOut / mySentOut. A name on both sides (mirror) is the foe's only if the move hit one of ours.
+    // foeSentOut / mySentOut. A name on both sides (mirror) is the foe's only if everything it hit is ours.
     function sides() {
         const key = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         let foe = new Set(), mine = new Set();
@@ -522,10 +522,16 @@
                 else if (e.type === 'mySentOut') (e.names || []).forEach(x => mine.add(key(x)));
                 else if (e.type === 'myMove' && e.name && foe.has(key(e.name))) {
                     const hits = e.hits || [];
-                    const hitsOurs = hits.some(h => mine.has(key(h.name)) && !foe.has(key(h.name)));
-                    const hitsFoes = hits.length > 0 && hits.every(h => foe.has(key(h.name)) && !mine.has(key(h.name)));
-                    // A move that only hit the foe's side is ours (a mirror we didn't see come in, e.g. Tyranitar vs Tyranitar)
-                    if (hitsOurs || (!mine.has(key(e.name)) && !hitsFoes)) {
+                    const onlyOurs = h => mine.has(key(h.name)) && !foe.has(key(h.name));
+                    const onlyFoes = h => foe.has(key(h.name)) && !mine.has(key(h.name));
+                    const mirror = mine.has(key(e.name));
+                    // Not a mirror: the foe's, unless it only hit the foe's side (our mon came in by a phrase we
+                    // didn't read, e.g. our Tyranitar vs theirs). Mirror (both sides have that name): the foe's only if
+                    // everything it hit is ours. Anything else stays ours, so it never fades the foe's sets: a spread
+                    // move that hit one mon on each side can be either Golduck's.
+                    const isFoe = mirror ? hits.length > 0 && hits.every(onlyOurs)
+                                         : !(hits.length > 0 && hits.every(onlyFoes));
+                    if (isFoe) {
                         return { type: 'foeMove', species: e.name, move: e.move, hit: hits.length > 0, heal: !!e.heal };
                     }
                 }

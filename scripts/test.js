@@ -187,11 +187,21 @@ test('a log without "The foe\'s": foe moves are read by who is on which side', (
         [['myMove', 'Ragga9a', 'Fake Out'], ['foeMove', 'Golduck', 'Scald'], ['foeMove', 'Golduck', 'Rest']]);
     assert.strictEqual(ev[ev.length - 1].heal, true);
 });
-test('mirror: a name on both sides is the foe\'s only if it hit one of ours', () => {
+test('Tyranitar vs Tyranitar, ours came in by "Get \'em": hitting only the foe\'s side is ours', () => {
     const ev = sideRun([L('1:00:00', 'You are challenged by Dragon Tamer TREVON[237]!'), L('1:00:01', 'Dragon Tamer TREVON[237] sent out Tyranitar and Lapras!'),
         L('1:00:02', 'Nithyyy sent out Gengar and Dusknoir!'), L('1:00:03', "Your foe's weak! Get 'em, Tyranitar!"),
         L('1:00:04', 'Tyranitar used Crunch! ( Lapras -3,6% )'), L('1:00:05', 'Tyranitar used Stone Edge! ( Gengar -40% )')]);
     assert.deepStrictEqual(ev.filter(e => /Move$/.test(e.type)).map(e => e.type), ['myMove', 'foeMove']);
+});
+test('mirror (Golduck vs Golduck): foe\'s only if everything it hit is ours, never a wrong fade', () => {
+    const head = [L('1:00:00', 'You are challenged by Nurse DOMINIC[148]!'), L('1:00:01', 'Nurse DOMINIC[148] sent out Golduck and Scyther!'),
+                  L('1:00:02', 'Shamandara sent out Golduck and Saq3bi!')];
+    const last = line => { const ev = sideRun([...head, L('1:00:03', line)]); return ev[ev.length - 1].type; };
+    assert.strictEqual(last('Golduck used Scald! ( Saq3bi -40% )'), 'foeMove');
+    assert.strictEqual(last('Golduck used Scald! ( Scyther -30% )'), 'myMove');
+    assert.strictEqual(last('Golduck used Surf! ( Scyther -30%, Saq3bi -10% )'), 'myMove');   // either side's Golduck: don't guess
+    assert.strictEqual(last('Golduck used Scald! ( Golduck -30% )'), 'myMove');                // either: don't guess
+    assert.strictEqual(last('Golduck used Calm Mind!'), 'myMove');
 });
 test('all the switch-in phrases are our send-outs', () => {
     for (const m of ['Go! Gliscor!', "You're in charge, Gliscor!", 'Go for it, Gliscor!', "Your foe's weak! Get 'em, Gliscor!"])
