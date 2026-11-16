@@ -1995,10 +1995,11 @@ function applyBattleEvents(events, replay) {
     let changed = false;
     const results = [];
     if (!auto.tracker) auto.tracker = newTracker();
+    if (!auto.sides) auto.sides = BattleLog.sides();
     auto.applying = true;
     try {
         for (const raw of events) {
-            const e = resolveLogEvent(raw);
+            const e = auto.sides.feed(resolveLogEvent(raw));
             if (!e) { debugStep(raw, null, null); continue; }
             const facts = auto.tracker.event(e);
             if (applyFacts(facts)) changed = true;
@@ -2091,6 +2092,7 @@ async function pollAuto() {
             events = BattleLog.parse(done);
             auto.push = BattleLog.reader(undefined, held);
             auto.tracker = newTracker();
+            auto.sides = BattleLog.sides();
             // Starting up: only the latest battle matters, and nothing from it is counted on the streak
             const last = events.map(e => e.type).lastIndexOf('challenge');
             events = last >= 0 ? events.slice(last) : [];

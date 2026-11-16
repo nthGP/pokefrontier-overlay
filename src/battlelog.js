@@ -119,10 +119,20 @@
                 events.push({ type: 'won', index: null, name: r[1] });
             } else if ((r = m.match(/^(.+?)\[(\d+)\] sent out (.+)!$/))) {
                 events.push({ type: 'foeSentOut', index: +r[2], species: r[3].split(' and ').map(monName).filter(Boolean) });
-            } else if ((r = m.match(/^Go! (.+)!$/))) {
+            } else if ((r = m.match(/^(?:Go!|You're in charge,|Go for it,|Your foe's weak! Get 'em,|Just a little more! Hang in there,) (.+)!$/))) {
+                // The game picks one of these phrases for our switch-ins (seen in our logs: Go! 980, You're in charge 197,
+                // Go for it 123, Your foe's weak! Get 'em 89; "Hang in there" is the usual game text, not seen yet)
                 events.push({ type: 'mySentOut', names: r[1].split(' and ').map(monName).filter(Boolean) });
             } else if ((r = m.match(/^([^\[]+?) sent out (.+)!$/))) {
                 events.push({ type: 'sentOut', who: clean(r[1]), names: r[2].split(' and ').map(monName).filter(Boolean) });
+            } else if ((r = m.match(/^(The foe's )?(.+?) frisked (the foe's )?(.+?) and found (?:one |its )?(.+?)!$/))) {
+                // Frisk: "Dusknoir frisked Latias and found one ꀅLife Orb (ATK)!". Usually no "The foe's" on either
+                // name (a foe that traced Frisk prints "Gardevoir frisked Gengar..."), so sides() works out whose it is.
+                const item = (itemIn(m) || r[5].replace(/[^\x20-\x7e\u00c0-\u024f]/g, '').replace(/\s*\([^)]*\)\s*$/, '')).trim();
+                const e = { type: 'frisk', by: monName(r[2]), target: monName(r[4]), item };
+                if (r[1]) e.byFoe = true;
+                if (r[3]) e.targetFoe = true;
+                if (item) events.push(e);
             } else if (m === "Your team's Attack fell!") {
                 // Intimidate: the log doesn't say whose (seen 2026-10-18/19 right after the foe's send-out)
                 events.push({ type: 'foeAbility', species: null, ability: 'Intimidate' });
@@ -169,8 +179,12 @@
             } else if (WEATHER[m]) {
                 // Weather from an ability (no move used): only meaningful right after a send-out, the app checks that
                 events.push({ type: 'weather', ability: WEATHER[m] });
-            } else if ((r = m.match(/^[^\[]+? used (.+?)!(?: \((.*)\))?$/)) && !m.startsWith("The foe's ")) {
-                events.push({ type: 'myMove', move: clean(r[1]), hits: damageList(r[2]) });
+            } else if ((r = m.match(/^([^\[]+?) used (.+?)!(?: \((.*)\))?$/)) && !m.startsWith("The foe's ")) {
+                // Usually ours. But some players' logs (reported 2026-11-16, doubles) print the foe's moves without
+                // "The foe's" too: sides() below turns those into foeMove by who is on which side.
+                const e = { type: 'myMove', name: monName(r[1]), move: clean(r[2]), hits: damageList(r[3]) };
+                if (/\+\d/.test(r[3] || '')) e.heal = true;
+                events.push(e);
             } else {
                 // Item messages: the item name carries an icon character (private-use glyph) and often a tag: "ꀅLife Orb (ATK)"
                 const it = itemIn(m) || plainItem(m);
@@ -380,6 +394,8 @@
                 case 'foeFainted': { settle(out); const m = mon(ev.species); if (m) m.active = false; faintedThisTurn = true; break; }
                 case 'foeItem': {
                     const m = mon(ev.species);
+                    // Seen by our Frisk: the item is known, but nothing happened with it (no heal, no Balloon landing...)
+                    if (ev.frisk) { if (m) m.itemSeen = true; break; }
                     if (orbCheck && key(orbCheck.species) === key(ev.species) && key(ev.item) === 'lifeorb') orbCheck.seen = true;
                     if (HEALING_ITEMS.has(key(ev.item))) healed(ev.species);
                     if (entry && key(ev.item) === 'airballoon') entry.balloon.add(key(ev.species));
@@ -500,7 +516,50 @@
         return { event };
     }
 
-    const api = { parse, messages, reader, split, tracker };
+    // Which side a "X used Y!" without "The foe's" belongs to. Most logs print the foe's moves as "The foe's X used Y!",
+    // but some players' logs don't (Shamandara's doubles log, 2026-11-16: "Golduck used Scald! ( Saq3bi -44.1% )"),
+    // so the parser can't tell them from ours. This remembers the names each side sent out in the current battle and
+    // turns a myMove by a foe's Pokémon into a foeMove. Feed it every event in order, after sentOut is resolved to
+    // foeSentOut / mySentOut. A name on both sides (mirror) is the foe's only if everything it hit is ours.
+    function sides() {
+        const key = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        let foe = new Set(), mine = new Set();
+        return {
+            feed(e) {
+                if (!e) return e;
+                if (e.type === 'challenge') { foe = new Set(); mine = new Set(); }
+                else if (e.type === 'frisk') {
+                    // Whose item it found: the side opposite the frisker, else the side the target is on.
+                    // Unknown (a name on both sides) stays a 'frisk' event, which nothing acts on.
+                    const k = key(e.by), t = key(e.target);
+                    const targetFoe = e.byFoe ? false : e.targetFoe ? true
+                        : mine.has(k) && !foe.has(k) ? true : foe.has(k) && !mine.has(k) ? false
+                        : foe.has(t) && !mine.has(t) ? true : mine.has(t) && !foe.has(t) ? false : null;
+                    if (targetFoe) return { type: 'foeItem', species: e.target, item: e.item, frisk: true };
+                }
+                else if (e.type === 'foeSentOut') (e.species || []).forEach(x => foe.add(key(x)));
+                else if (e.type === 'mySentOut') (e.names || []).forEach(x => mine.add(key(x)));
+                else if (e.type === 'myMove' && e.name && foe.has(key(e.name))) {
+                    const hits = e.hits || [];
+                    const onlyOurs = h => mine.has(key(h.name)) && !foe.has(key(h.name));
+                    const onlyFoes = h => foe.has(key(h.name)) && !mine.has(key(h.name));
+                    const mirror = mine.has(key(e.name));
+                    // Not a mirror: the foe's, unless it only hit the foe's side (our mon came in by a phrase we
+                    // didn't read, e.g. our Tyranitar vs theirs). Mirror (both sides have that name): the foe's only if
+                    // everything it hit is ours. Anything else stays ours, so it never fades the foe's sets: a spread
+                    // move that hit one mon on each side can be either Golduck's.
+                    const isFoe = mirror ? hits.length > 0 && hits.every(onlyOurs)
+                                         : !(hits.length > 0 && hits.every(onlyFoes));
+                    if (isFoe) {
+                        return { type: 'foeMove', species: e.name, move: e.move, hit: hits.length > 0, heal: !!e.heal };
+                    }
+                }
+                return e;
+            },
+        };
+    }
+
+    const api = { parse, messages, reader, split, tracker, sides };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.BattleLog = api;
 })(this);

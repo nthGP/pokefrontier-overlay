@@ -14,7 +14,7 @@ const run = lines => { const t = tracker(); return B.parse(lines).flatMap(e => t
 test('Focus Sash proc is an item', () => {
     const ev = B.parse([L('12:47:53', '[#ff8a00]Gliscor[#] used'), 'Earthquake! ( [#ff8a00]Dugtrio[#] -99% )',
                         L('12:47:57', "The foe's [#ff8a00]Dugtrio[#] hung on using its ꌀFocus Sash (DEF)!")]);
-    assert.deepStrictEqual(ev[0], { type: 'myMove', move: 'Earthquake', hits: [{ name: 'Dugtrio', pct: 99 }] });
+    assert.deepStrictEqual(ev[0], { type: 'myMove', name: 'Gliscor', move: 'Earthquake', hits: [{ name: 'Dugtrio', pct: 99 }] });
     assert.deepStrictEqual(ev[1], { type: 'foeItem', species: 'Dugtrio', item: 'Focus Sash' });
 });
 
@@ -170,6 +170,64 @@ test('keeps the last 20 battles, and stores them between runs', () => {
 
 test('a name that is part of another word is left alone', () => {
     assert.strictEqual(D.redact('Ash sent out Ashwing; Cash used Ash', ['Ash']), '<player> sent out Ashwing; Cash used <player>');
+});
+
+
+// ---------------------------------------------------------------- sides: foe moves without "The foe's" (reported 2026-11-16)
+const P = (t, msg) => `[16/11/26 ${t} pm] [Battle] ${msg}`;
+const sideRun = lines => { const s = B.sides(); return B.parse(lines).map(e => e.type === 'sentOut' ? { type: 'mySentOut', names: e.names } : e).map(e => s.feed(e)); };
+test('a log without "The foe\'s": foe moves are read by who is on which side', () => {
+    const ev = sideRun([P('2:31:00', 'You are challenged by [#ff8a00]Preschooler[#] [#ff8a00]JAZLYN[160][#]!'),
+        P('2:31:02', '[#ff8a00]Preschooler[#] [#ff8a00]JAZLYN[160][#] sent out [#ff8a00]Kangaskhan[#] and'), '[#ff8a00]Golduck[#]!',
+        P('2:31:07', '[#ff8a00]Shamandara[#] sent out [#ff8a00]Ragga9a[#] and [#ff8a00]Saq3bi[#]!'),
+        P('2:31:29', '[#ff8a00]Ragga9a[#] used'), '[#ff8a00]Fake Out[#]! ( [#ff8a00]Kangaskhan[#] -7.3% )',
+        P('2:31:32', '[#ff8a00]Golduck[#] used'), '[#ff8a00]Scald[#]! ( [#ff8a00]Saq3bi[#] -44.1% )',
+        P('2:39:13', '[#ff8a00]Golduck[#] used'), '[#ff8a00]Rest[#]! ( [#ff8a00]Golduck[#] +68.7% )']);
+    assert.deepStrictEqual(ev.filter(e => /Move$/.test(e.type)).map(e => [e.type, e.species || e.name, e.move]),
+        [['myMove', 'Ragga9a', 'Fake Out'], ['foeMove', 'Golduck', 'Scald'], ['foeMove', 'Golduck', 'Rest']]);
+    assert.strictEqual(ev[ev.length - 1].heal, true);
+});
+test('Tyranitar vs Tyranitar, ours came in by "Get \'em": hitting only the foe\'s side is ours', () => {
+    const ev = sideRun([L('1:00:00', 'You are challenged by Dragon Tamer TREVON[237]!'), L('1:00:01', 'Dragon Tamer TREVON[237] sent out Tyranitar and Lapras!'),
+        L('1:00:02', 'Nithyyy sent out Gengar and Dusknoir!'), L('1:00:03', "Your foe's weak! Get 'em, Tyranitar!"),
+        L('1:00:04', 'Tyranitar used Crunch! ( Lapras -3,6% )'), L('1:00:05', 'Tyranitar used Stone Edge! ( Gengar -40% )')]);
+    assert.deepStrictEqual(ev.filter(e => /Move$/.test(e.type)).map(e => e.type), ['myMove', 'foeMove']);
+});
+test('mirror (Golduck vs Golduck): foe\'s only if everything it hit is ours, never a wrong fade', () => {
+    const head = [L('1:00:00', 'You are challenged by Nurse DOMINIC[148]!'), L('1:00:01', 'Nurse DOMINIC[148] sent out Golduck and Scyther!'),
+                  L('1:00:02', 'Shamandara sent out Golduck and Saq3bi!')];
+    const last = line => { const ev = sideRun([...head, L('1:00:03', line)]); return ev[ev.length - 1].type; };
+    assert.strictEqual(last('Golduck used Scald! ( Saq3bi -40% )'), 'foeMove');
+    assert.strictEqual(last('Golduck used Scald! ( Scyther -30% )'), 'myMove');
+    assert.strictEqual(last('Golduck used Surf! ( Scyther -30%, Saq3bi -10% )'), 'myMove');   // either side's Golduck: don't guess
+    assert.strictEqual(last('Golduck used Scald! ( Golduck -30% )'), 'myMove');                // either: don't guess
+    assert.strictEqual(last('Golduck used Calm Mind!'), 'myMove');
+});
+// ---------------------------------------------------------------- Frisk (2026-11-16)
+test('our Frisk tells the foe\'s item; a traced Frisk on our mons doesn\'t', () => {
+    const t = tracker();
+    const head = [L('1:00:00', 'You are challenged by Guitarist RAYMOND[286]!'), L('1:00:01', 'Guitarist RAYMOND[286] sent out Latias and Gardevoir!'),
+                  L('1:00:02', 'Nithyyy sent out Gengar and Dusknoir!'),
+                  L('1:00:03', 'Dusknoir frisked Latias and found one ꀅLife Orb (ATK)!'),
+                  L('1:00:03', 'Dusknoir frisked Gardevoir and found one ꀉSitrus Berry (HP)!'),
+                  L('1:00:04', "The foe's Gardevoir traced Dusknoir's Frisk!"),
+                  L('1:00:04', 'Gardevoir frisked Gengar and found one ꀂChoice Scarf (ATK)(SPEED)!')];
+    const ev = sideRun(head);
+    assert.deepStrictEqual(ev.filter(e => e.type === 'foeItem'),
+        [{ type: 'foeItem', species: 'Latias', item: 'Life Orb', frisk: true }, { type: 'foeItem', species: 'Gardevoir', item: 'Sitrus Berry', frisk: true }]);
+    assert.strictEqual(ev.filter(e => e.type === 'frisk').length, 1);           // Gardevoir frisking our Gengar: left alone
+    // A frisked Sitrus Berry isn't a heal and doesn't trip any item check
+    const facts = ev.flatMap(e => t.event(e));
+    assert(!facts.some(f => f.species === 'Gardevoir' && (f.noItem || f.healed)));
+});
+test('all the switch-in phrases are our send-outs', () => {
+    for (const m of ['Go! Gliscor!', "You're in charge, Gliscor!", 'Go for it, Gliscor!', "Your foe's weak! Get 'em, Gliscor!"])
+        assert.deepStrictEqual(B.parse([L('1:00:00', m)]), [{ type: 'mySentOut', names: ['Gliscor'] }], m);
+});
+test('a normal log (with "The foe\'s") is unchanged by sides()', () => {
+    const ev = sideRun([L('1:00:00', 'You are challenged by Expert WESTON[245]!'), L('1:00:01', 'Expert WESTON[245] sent out Gliscor!'),
+        L('1:00:02', 'Nithyyy sent out Gliscor!'), L('1:00:03', "The foe's Gliscor used Earthquake! ( Gliscor -20% )"), L('1:00:04', 'Gliscor used Toxic!')]);
+    assert.deepStrictEqual(ev.filter(e => /Move$/.test(e.type)).map(e => e.type), ['foeMove', 'myMove']);
 });
 
 console.log(`\n${n} passed`);
