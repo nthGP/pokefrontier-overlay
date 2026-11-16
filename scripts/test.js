@@ -203,6 +203,23 @@ test('mirror (Golduck vs Golduck): foe\'s only if everything it hit is ours, nev
     assert.strictEqual(last('Golduck used Scald! ( Golduck -30% )'), 'myMove');                // either: don't guess
     assert.strictEqual(last('Golduck used Calm Mind!'), 'myMove');
 });
+// ---------------------------------------------------------------- Frisk (2026-11-16)
+test('our Frisk tells the foe\'s item; a traced Frisk on our mons doesn\'t', () => {
+    const t = tracker();
+    const head = [L('1:00:00', 'You are challenged by Guitarist RAYMOND[286]!'), L('1:00:01', 'Guitarist RAYMOND[286] sent out Latias and Gardevoir!'),
+                  L('1:00:02', 'Nithyyy sent out Gengar and Dusknoir!'),
+                  L('1:00:03', 'Dusknoir frisked Latias and found one ꀅLife Orb (ATK)!'),
+                  L('1:00:03', 'Dusknoir frisked Gardevoir and found one ꀉSitrus Berry (HP)!'),
+                  L('1:00:04', "The foe's Gardevoir traced Dusknoir's Frisk!"),
+                  L('1:00:04', 'Gardevoir frisked Gengar and found one ꀂChoice Scarf (ATK)(SPEED)!')];
+    const ev = sideRun(head);
+    assert.deepStrictEqual(ev.filter(e => e.type === 'foeItem'),
+        [{ type: 'foeItem', species: 'Latias', item: 'Life Orb', frisk: true }, { type: 'foeItem', species: 'Gardevoir', item: 'Sitrus Berry', frisk: true }]);
+    assert.strictEqual(ev.filter(e => e.type === 'frisk').length, 1);           // Gardevoir frisking our Gengar: left alone
+    // A frisked Sitrus Berry isn't a heal and doesn't trip any item check
+    const facts = ev.flatMap(e => t.event(e));
+    assert(!facts.some(f => f.species === 'Gardevoir' && (f.noItem || f.healed)));
+});
 test('all the switch-in phrases are our send-outs', () => {
     for (const m of ['Go! Gliscor!', "You're in charge, Gliscor!", 'Go for it, Gliscor!', "Your foe's weak! Get 'em, Gliscor!"])
         assert.deepStrictEqual(B.parse([L('1:00:00', m)]), [{ type: 'mySentOut', names: ['Gliscor'] }], m);

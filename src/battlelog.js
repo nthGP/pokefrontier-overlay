@@ -125,6 +125,14 @@
                 events.push({ type: 'mySentOut', names: r[1].split(' and ').map(monName).filter(Boolean) });
             } else if ((r = m.match(/^([^\[]+?) sent out (.+)!$/))) {
                 events.push({ type: 'sentOut', who: clean(r[1]), names: r[2].split(' and ').map(monName).filter(Boolean) });
+            } else if ((r = m.match(/^(The foe's )?(.+?) frisked (the foe's )?(.+?) and found (?:one |its )?(.+?)!$/))) {
+                // Frisk: "Dusknoir frisked Latias and found one ꀅLife Orb (ATK)!". Usually no "The foe's" on either
+                // name (a foe that traced Frisk prints "Gardevoir frisked Gengar..."), so sides() works out whose it is.
+                const item = (itemIn(m) || r[5].replace(/[^\x20-\x7e\u00c0-\u024f]/g, '').replace(/\s*\([^)]*\)\s*$/, '')).trim();
+                const e = { type: 'frisk', by: monName(r[2]), target: monName(r[4]), item };
+                if (r[1]) e.byFoe = true;
+                if (r[3]) e.targetFoe = true;
+                if (item) events.push(e);
             } else if (m === "Your team's Attack fell!") {
                 // Intimidate: the log doesn't say whose (seen 2026-10-18/19 right after the foe's send-out)
                 events.push({ type: 'foeAbility', species: null, ability: 'Intimidate' });
@@ -386,6 +394,8 @@
                 case 'foeFainted': { settle(out); const m = mon(ev.species); if (m) m.active = false; faintedThisTurn = true; break; }
                 case 'foeItem': {
                     const m = mon(ev.species);
+                    // Seen by our Frisk: the item is known, but nothing happened with it (no heal, no Balloon landing...)
+                    if (ev.frisk) { if (m) m.itemSeen = true; break; }
                     if (orbCheck && key(orbCheck.species) === key(ev.species) && key(ev.item) === 'lifeorb') orbCheck.seen = true;
                     if (HEALING_ITEMS.has(key(ev.item))) healed(ev.species);
                     if (entry && key(ev.item) === 'airballoon') entry.balloon.add(key(ev.species));
@@ -518,6 +528,15 @@
             feed(e) {
                 if (!e) return e;
                 if (e.type === 'challenge') { foe = new Set(); mine = new Set(); }
+                else if (e.type === 'frisk') {
+                    // Whose item it found: the side opposite the frisker, else the side the target is on.
+                    // Unknown (a name on both sides) stays a 'frisk' event, which nothing acts on.
+                    const k = key(e.by), t = key(e.target);
+                    const targetFoe = e.byFoe ? false : e.targetFoe ? true
+                        : mine.has(k) && !foe.has(k) ? true : foe.has(k) && !mine.has(k) ? false
+                        : foe.has(t) && !mine.has(t) ? true : mine.has(t) && !foe.has(t) ? false : null;
+                    if (targetFoe) return { type: 'foeItem', species: e.target, item: e.item, frisk: true };
+                }
                 else if (e.type === 'foeSentOut') (e.species || []).forEach(x => foe.add(key(x)));
                 else if (e.type === 'mySentOut') (e.names || []).forEach(x => mine.add(key(x)));
                 else if (e.type === 'myMove' && e.name && foe.has(key(e.name))) {
