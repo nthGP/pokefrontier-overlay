@@ -119,7 +119,9 @@
                 events.push({ type: 'won', index: null, name: r[1] });
             } else if ((r = m.match(/^(.+?)\[(\d+)\] sent out (.+)!$/))) {
                 events.push({ type: 'foeSentOut', index: +r[2], species: r[3].split(' and ').map(monName).filter(Boolean) });
-            } else if ((r = m.match(/^Go! (.+)!$/))) {
+            } else if ((r = m.match(/^(?:Go!|You're in charge,|Go for it,|Your foe's weak! Get 'em,|Just a little more! Hang in there,) (.+)!$/))) {
+                // The game picks one of these phrases for our switch-ins (seen in our logs: Go! 980, You're in charge 197,
+                // Go for it 123, Your foe's weak! Get 'em 89; "Hang in there" is the usual game text, not seen yet)
                 events.push({ type: 'mySentOut', names: r[1].split(' and ').map(monName).filter(Boolean) });
             } else if ((r = m.match(/^([^\[]+?) sent out (.+)!$/))) {
                 events.push({ type: 'sentOut', who: clean(r[1]), names: r[2].split(' and ').map(monName).filter(Boolean) });
@@ -169,8 +171,12 @@
             } else if (WEATHER[m]) {
                 // Weather from an ability (no move used): only meaningful right after a send-out, the app checks that
                 events.push({ type: 'weather', ability: WEATHER[m] });
-            } else if ((r = m.match(/^[^\[]+? used (.+?)!(?: \((.*)\))?$/)) && !m.startsWith("The foe's ")) {
-                events.push({ type: 'myMove', move: clean(r[1]), hits: damageList(r[2]) });
+            } else if ((r = m.match(/^([^\[]+?) used (.+?)!(?: \((.*)\))?$/)) && !m.startsWith("The foe's ")) {
+                // Usually ours. But some players' logs (reported 2026-11-16, doubles) print the foe's moves without
+                // "The foe's" too: sides() below turns those into foeMove by who is on which side.
+                const e = { type: 'myMove', name: monName(r[1]), move: clean(r[2]), hits: damageList(r[3]) };
+                if (/\+\d/.test(r[3] || '')) e.heal = true;
+                events.push(e);
             } else {
                 // Item messages: the item name carries an icon character (private-use glyph) and often a tag: "ꀅLife Orb (ATK)"
                 const it = itemIn(m) || plainItem(m);
@@ -500,7 +506,35 @@
         return { event };
     }
 
-    const api = { parse, messages, reader, split, tracker };
+    // Which side a "X used Y!" without "The foe's" belongs to. Most logs print the foe's moves as "The foe's X used Y!",
+    // but some players' logs don't (Shamandara's doubles log, 2026-11-16: "Golduck used Scald! ( Saq3bi -44.1% )"),
+    // so the parser can't tell them from ours. This remembers the names each side sent out in the current battle and
+    // turns a myMove by a foe's Pokémon into a foeMove. Feed it every event in order, after sentOut is resolved to
+    // foeSentOut / mySentOut. A name on both sides (mirror) is the foe's only if the move hit one of ours.
+    function sides() {
+        const key = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        let foe = new Set(), mine = new Set();
+        return {
+            feed(e) {
+                if (!e) return e;
+                if (e.type === 'challenge') { foe = new Set(); mine = new Set(); }
+                else if (e.type === 'foeSentOut') (e.species || []).forEach(x => foe.add(key(x)));
+                else if (e.type === 'mySentOut') (e.names || []).forEach(x => mine.add(key(x)));
+                else if (e.type === 'myMove' && e.name && foe.has(key(e.name))) {
+                    const hits = e.hits || [];
+                    const hitsOurs = hits.some(h => mine.has(key(h.name)) && !foe.has(key(h.name)));
+                    const hitsFoes = hits.length > 0 && hits.every(h => foe.has(key(h.name)) && !mine.has(key(h.name)));
+                    // A move that only hit the foe's side is ours (a mirror we didn't see come in, e.g. Tyranitar vs Tyranitar)
+                    if (hitsOurs || (!mine.has(key(e.name)) && !hitsFoes)) {
+                        return { type: 'foeMove', species: e.name, move: e.move, hit: hits.length > 0, heal: !!e.heal };
+                    }
+                }
+                return e;
+            },
+        };
+    }
+
+    const api = { parse, messages, reader, split, tracker, sides };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.BattleLog = api;
 })(this);
