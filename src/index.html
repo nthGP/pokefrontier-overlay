@@ -330,6 +330,9 @@
         .cc-pct small { font-size: 11px; color: var(--muted); }
         .cc-pct.dim { color: var(--faint); }
         .cc-pct.ko { color: var(--accent); }
+        .cc-pp { display: block; margin-top: 1px; font: 600 12px var(--font-body); color: var(--muted); letter-spacing: .02em; }
+        .cc-pp.low { color: var(--warn); }
+        .cc-pp.out { color: var(--danger); }
         .cc-head { font: 700 16px/1.3 var(--font-body); color: var(--ink); }
         body.display .cc-head { font-size: 17px; }
         .cc-rolls { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
@@ -471,6 +474,7 @@
                 <button class="icon-btn" id="teamBtn" title="Show or hide your team (also in OBS)">Team</button>
                 <button class="icon-btn" id="streakBtn" title="Show or hide the streak panel here (OBS keeps showing it)">Streak</button>
                 <button class="icon-btn" id="calcBtn" title="Show or hide the damage calc here (OBS keeps showing it)">Calc</button>
+                <button class="icon-btn" id="ppBtn" title="Count the opponent's PP from the log (shown in the calc; resets every battle)">PP</button>
             </div>
         </span>
         <button class="icon-btn" id="themeBtn" title="Colours">Theme</button>
@@ -517,6 +521,7 @@
     <div id="dialog"></div>
 </div>
 
+<script src="pp.js"></script>
 <script src="battlelog.js"></script>
 <script src="debuglog.js"></script>
 <script src="calc.js"></script>
@@ -633,6 +638,7 @@ const DEFAULT_STATE = {
     records: {},           // streaks: { "tower|singles|50": { streak, pb, wr } }
     auto: { on: false, dir: '', streak: true },   // auto mode: follow the game's chat log
     showCalc: true, showStreak: true,
+    showPP: true,          // count the opponent's PP from the log (shown in the calc)
     // damage calc: which of your Pokémon / which opponent pick, their set, stat boosts, HP %, field, selected move
     calc: { mine: 0, foe: 0, foeSets: {}, boosts: { mine: {}, foe: {} }, hp: { mine: 100, foe: 100 }, weather: '', gravity: false,
             sides: { mine: {}, foe: {} }, edits: {}, sel: null },
@@ -852,7 +858,8 @@ function setFitWhy(set, pick) {
     const revealed = pick.revealed || [];
     // A seen item rules out sets known to hold something else (and sets with no scouted item stay possible)
     if (pick.item && set.item && norm(set.item) !== norm(pick.item)) return ['out', `holds ${set.item}, log showed ${pick.item}`];
-    if (set.item && (pick.noItem || []).some(i => norm(i) === norm(set.item))) return ['out', `log ruled out ${set.item}`];
+    // A seen item wins over an earlier "no X" for the same item (the log order can fool a check)
+    if (set.item && !(pick.item && norm(pick.item) === norm(set.item)) && (pick.noItem || []).some(i => norm(i) === norm(set.item))) return ['out', `log ruled out ${set.item}`];
     if (pick.ability && set.ability && norm(set.ability) !== norm(pick.ability)) return ['out', `has ${set.ability}, log showed ${pick.ability}`];
     if (set.ability && (pick.noAbility || []).some(a => norm(a) === norm(set.ability))) return ['out', `log ruled out ${set.ability}`];
     if (!revealed.length) return ['', ''];
@@ -1066,6 +1073,7 @@ function syncControls() {
     document.getElementById('pickerBtn').classList.toggle('on', state.showPicker);
     document.getElementById('teamBtn').classList.toggle('on', state.showTeam);
     document.getElementById('calcBtn').classList.toggle('on', state.showCalc);
+    document.getElementById('ppBtn').classList.toggle('on', state.showPP !== false);
     const ts = currentTrainers();
     const input = document.getElementById('trainerInput');
     input.placeholder = isPair() ? 'Both opponents: pick one, then the other' : 'NPC name, class or #';
@@ -1103,6 +1111,7 @@ function wireControls() {
     document.getElementById('pickerBtn').onclick = () => commit({ showPicker: !state.showPicker });
     document.getElementById('teamBtn').onclick = () => commit({ showTeam: !state.showTeam });
     document.getElementById('calcBtn').onclick = () => commit({ showCalc: !state.showCalc });
+    document.getElementById('ppBtn').onclick = () => commit({ showPP: state.showPP === false });
     document.getElementById('streakBtn').onclick = () => commit({ showStreak: !state.showStreak });
     const viewMenu = document.getElementById('viewMenu');
     document.getElementById('viewBtn').onclick = e => { e.stopPropagation(); viewMenu.classList.toggle('hidden'); };
@@ -2056,6 +2065,10 @@ function applyEvent(e, results) {
         if (/^struggle$/i.test(e.move)) return false;
         const pick = state.picks.find(p => norm(p.species) === norm(e.species));
         if (pick && !pick.revealed.some(m => moveKey(m) === moveKey(e.move))) { pick.revealed.push(e.move); changed = true; }
+        if (pick) { countPP(pick, e.move); changed = true; }
+    } else if (e.type === 'turn') {
+        // A caller that failed ("But it failed!") called nothing: don't skip a move next turn
+        for (const p of state.picks) p.ppCalling = false;
     } else if (e.type === 'foeItem') {
         const pick = state.picks.find(p => norm(p.species) === norm(e.species));
         // Only items some set actually holds (the game's names can differ, e.g. Covert Mantle)
@@ -2356,6 +2369,7 @@ function calcRun() {
         if (sf.moves.some(m => !m.trim())) notes.push(`${foeSet.pokemon}-${foeSet.set_id}: unscouted move slot(s)`);
         const mineMoves = calcMoves(sm, A, B, 'mine');
         const foeMoves = calcMoves(sf, B, A, 'foe');
+        if (state.showPP !== false) foeMoves.forEach((m, i) => { const p = !m.unk && ppLeft(pick, m.name || sf.moves[i]); if (p) m.pp = p; });
         const list = side => side === 'mine' ? mineMoves : foeMoves;
         let sel = c.sel && list(c.sel.side)[c.sel.i] && !list(c.sel.side)[c.sel.i].unk ? c.sel : null;
         if (!sel) {
@@ -2398,13 +2412,36 @@ function speedPill(data, otherSpe) {
     return `<span class="spd ${order}" title="Final speed${changed ? ` (stat ${data.rawSpe})` : ''}">${order === 'first' ? SPD_BOLT : ''}${num}${word ? ` · ${word}` : ''}</span>`;
 }
 
+// ---- opponent PP counter: uses counted from the log, against base PP (NPCs have no PP Ups) ----
+// The count lives on the pick, so it starts over with every battle (picks are cleared at the challenge).
+const PP_CALLERS = new Set(['sleeptalk', 'assist', 'metronome', 'mirrormove', 'copycat', 'mefirst', 'naturepower']);
+const ppKey = m => { const k = moveKey(m); return k.startsWith('hiddenpower') || /^hp(bug|dark|dragon|electric|fighting|fire|flying|ghost|grass|ground|ice|poison|psychic|rock|steel|water)$/.test(k) ? 'hiddenpower' : k; };
+const basePP = m => { const P = window.MOVE_PP || {}; return P[ppKey(m)] || P[norm(m)] || null; };
+function countPP(pick, move) {
+    if (pick.ppCalling) { pick.ppCalling = false; return; }       // the move Sleep Talk & co. called uses no PP
+    const k = ppKey(move);
+    if (PP_CALLERS.has(k)) pick.ppCalling = true;
+    // Our Pressure (the Pokémon we have out in the calc) makes every move cost 2
+    const mine = calcSides().mine;
+    const cost = mine && norm(mine.ability) === 'pressure' ? 2 : 1;
+    pick.ppUsed = { ...(pick.ppUsed || {}), [k]: ((pick.ppUsed || {})[k] || 0) + cost };
+}
+function ppLeft(pick, move) {
+    const max = basePP(move);
+    if (!max || !move || !move.trim()) return null;
+    const used = ((pick && pick.ppUsed) || {})[ppKey(move)] || 0;
+    return { left: Math.max(0, max - used), max };
+}
+
 function calcColumn(side, data, sel, otherSpe) {
     const rows = data.moves.map((m, i) => {
         const cls = ['cc-move', m.unk ? 'unk' : 't-' + (m.type || 'Unknown'), sel && sel.side === side && sel.i === i ? 'sel' : ''].join(' ');
         const tag = [m.multi ? `×${m.hits}` : '', m.crit ? 'crit' : ''].filter(Boolean).join(' ');
-        const pct = m.unk ? '<span class="cc-pct dim">?</span>'
+        let pct = m.unk ? '<span class="cc-pct dim">?</span>'
                   : m.status ? '<span class="cc-pct dim">—</span>'
                   : `<span class="cc-pct${m.ko ? ' ko' : ''}">${fmtPct(m.lo)} – ${fmtPct(m.hi)}%${tag ? ` <small>${tag}</small>` : ''}</span>`;
+        const pp = m.pp ? `<span class="cc-pp${m.pp.left === 0 ? ' out' : m.pp.left / m.pp.max <= 0.25 ? ' low' : ''}" title="PP left this battle">${m.pp.left}/${m.pp.max} PP</span>` : '';
+        if (pp) pct = pct.replace(/<\/span>$/, `${pp}</span>`);
         return `<span class="${cls}" data-cside="${side}" data-ci="${i}" title="${esc(m.name)}">${esc(moveLabel(m.name))}</span>${pct}`;
     }).join('');
     return `<div class="cc-col"><h4><span class="nm">${esc(data.name)}'s moves</span>${speedPill(data, otherSpe)}</h4><div class="cc-list">${rows}</div></div>`;

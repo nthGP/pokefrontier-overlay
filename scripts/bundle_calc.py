@@ -52,6 +52,9 @@ PATCHES = [
         defender.named('Latios', 'Latias', 'Latios-Mega', 'Latias-Mega')) ||
         (defender.hasItem('Eviolite')""",
      """    if ((defender.hasItem('Eviolite')"""),
+    # Leech Life is 80 BP in PokeMMO (Gen 7+ value; the Gen 5 data has 20).
+    ("""    'Leech Life': { bp: 20, type: 'Bug', drain: [1, 2] },""",
+     """    'Leech Life': { bp: 80, type: 'Bug', drain: [1, 2] },"""),
 ]
 for old, new in PATCHES:
     assert bundle.count(old) == 1, 'PokeMMO patch no longer matches: ' + old.splitlines()[0]
