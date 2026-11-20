@@ -229,5 +229,16 @@ test('a normal log (with "The foe\'s") is unchanged by sides()', () => {
         L('1:00:02', 'Nithyyy sent out Gliscor!'), L('1:00:03', "The foe's Gliscor used Earthquake! ( Gliscor -20% )"), L('1:00:04', 'Gliscor used Toxic!')]);
     assert.deepStrictEqual(ev.filter(e => /Move$/.test(e.type)).map(e => e.type), ['foeMove', 'myMove']);
 });
+// ---------------------------------------------------------------- Gem after a faint (2026-11-21)
+test('Explosion: a Gem text after "fainted!" is that Pokémon\'s Gem, not "no Gem"', () => {
+    const t = B.tracker({ abilitiesOf: () => [null], typesOf: () => [], moveInfo: m => /explosion/i.test(m) ? ['Normal', 'Physical', 250] : null });
+    const lines = [L('0:31:00', 'You are challenged by Expert WESTON[245]!'), L('0:31:01', 'Expert WESTON[245] sent out Regirock!'),
+                   L('0:31:02', 'Nithyyy sent out Gliscor!'), L('0:31:03', 'Turn 1 started!'),
+                   L('0:31:04', "The foe's Regirock used Explosion! ( Gliscor -60,2% )"), L('0:31:05', "The foe's Regirock fainted!"),
+                   L('0:31:06', "The ꈁNormal Gem strengthened Explosion's power!"), L('0:31:07', 'Expert WESTON[245] sent out Blaziken!')];
+    const facts = B.parse(lines).flatMap(e => t.event(e)).filter(f => f.species === 'Regirock');
+    assert(facts.some(f => f.item === 'Normal Gem'));
+    assert(!facts.some(f => (f.noItem || []).includes('Normal Gem')));
+});
 
 console.log(`\n${n} passed`);

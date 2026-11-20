@@ -313,8 +313,10 @@
         const itemUnknown = m => m && !m.swapped && !m.itemSeen;
 
         // A message closes the checks waiting on it: the next move, turn, switch or faint
-        function settle(out) {
-            if (gemCheck) {
+        // keepGem: a faint doesn't close the Gem check. With Explosion (and any KO) the "fainted!" line can come
+        // before "The Normal Gem strengthened Explosion's power!" (Regirock, 25/10/26).
+        function settle(out, keepGem) {
+            if (gemCheck && !keepGem) {
                 const g = gemCheck; gemCheck = null;
                 if (!g.seen && !g.failed && itemUnknown(mon(g.species))) out.push({ species: g.species, noItem: [g.type + ' Gem'] });
             }
@@ -391,7 +393,7 @@
                     break;
                 }
                 case 'foeHealed': healed(ev.species); break;
-                case 'foeFainted': { settle(out); const m = mon(ev.species); if (m) m.active = false; faintedThisTurn = true; break; }
+                case 'foeFainted': { settle(out, true); const m = mon(ev.species); if (m) m.active = false; faintedThisTurn = true; break; }
                 case 'foeItem': {
                     const m = mon(ev.species);
                     // Seen by our Frisk: the item is known, but nothing happened with it (no heal, no Balloon landing...)
