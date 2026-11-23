@@ -55,6 +55,9 @@ PATCHES = [
     # Leech Life is 80 BP in PokeMMO (Gen 7+ value; the Gen 5 data has 20).
     ("""    'Leech Life': { bp: 20, type: 'Bug', drain: [1, 2] },""",
      """    'Leech Life': { bp: 80, type: 'Bug', drain: [1, 2] },"""),
+    # Mist Ball is 95 BP in PokeMMO (Gen 9 value; the Gen 5 data has 70). Confirmed in-game by the user, 2026-11-23.
+    ("""    'Mist Ball': { bp: 70, type: 'Psychic' },""",
+     """    'Mist Ball': { bp: 95, type: 'Psychic' },"""),
 ]
 for old, new in PATCHES:
     assert bundle.count(old) == 1, 'PokeMMO patch no longer matches: ' + old.splitlines()[0]
