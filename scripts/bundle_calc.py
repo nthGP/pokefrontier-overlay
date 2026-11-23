@@ -58,6 +58,9 @@ PATCHES = [
     # Mist Ball is 95 BP in PokeMMO (Gen 9 value; the Gen 5 data has 70). Confirmed in-game by the user, 2026-11-23.
     ("""    'Mist Ball': { bp: 70, type: 'Psychic' },""",
      """    'Mist Ball': { bp: 95, type: 'Psychic' },"""),
+    # Luster Purge is 95 BP in PokeMMO too (Gen 9 value; Gen 5 data has 70). Confirmed in-game by the user, 2026-11-23.
+    ("""    'Luster Purge': { bp: 70, type: 'Psychic' },""",
+     """    'Luster Purge': { bp: 95, type: 'Psychic' },"""),
 ]
 for old, new in PATCHES:
     assert bundle.count(old) == 1, 'PokeMMO patch no longer matches: ' + old.splitlines()[0]

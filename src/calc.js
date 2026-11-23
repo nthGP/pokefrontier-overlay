@@ -1819,7 +1819,7 @@ var ADV_PATCH = {
     'Ice Ball': { bp: 30, type: 'Ice', makesContact: true },
     'Sheer Cold': { bp: 0, type: 'Ice' },
     Howl: { bp: 0, category: 'Status', type: 'Normal' },
-    'Luster Purge': { bp: 70, type: 'Psychic' },
+    'Luster Purge': { bp: 95, type: 'Psychic' },
     'Mist Ball': { bp: 95, type: 'Psychic' },
     'Psycho Boost': { bp: 140, type: 'Psychic', self: { boosts: { spa: -2 } } },
     Refresh: { bp: 0, category: 'Status', type: 'Normal' },
